@@ -5,8 +5,70 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:DigitalSorter"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="DigitalSorter" Height="450" Width="800" ResizeMode="NoResize">
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="60" />
+        </Grid.RowDefinitions>
 
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="0.6*" />
+            <ColumnDefinition Width="0.4*" />
+        </Grid.ColumnDefinitions>
+
+        <ListView Grid.Row="0" Grid.Column="0" Margin="10 10">
+            <ListViewItem />
+            <ListViewItem />
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Photo source">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="C:/Source/Photo01.jpg" />
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Vertical" Margin="10 10">
+            <TextBlock Text="Destination:" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Column="0" Text="VALIE" />
+                <Button Grid.Column="1" Content="Search..." Margin="5 0" Padding="5 0" />
+            </Grid>
+
+            <TextBlock Text="Pattern:" />
+            <ComboBox Margin="0 5">
+                <ComboBoxItem Content="Data" />
+                <ComboBoxItem Content="Data i czas" />
+            </ComboBox>
+        </StackPanel>
+
+        <Grid Grid.Row="1" Grid.Column="0" Margin="40 15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0" Width="120" Content="Add" />
+            <Button Grid.Column="2" Width="120" Content="Remove" />
+        </Grid>
+
+        <Grid Grid.Row="1" Grid.Column="1" HorizontalAlignment="Center" Margin="0 15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0" Width="120" Content="Generate" />
+        </Grid>
     </Grid>
 </Window>
