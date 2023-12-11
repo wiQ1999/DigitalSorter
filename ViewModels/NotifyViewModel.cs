@@ -7,7 +7,7 @@ public class NotifyViewModel : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    protected void OnChangedChanged(
+    protected void OnPropertyChanged(
         [CallerMemberName] string propName = null!)
     {
         PropertyChanged?.Invoke(

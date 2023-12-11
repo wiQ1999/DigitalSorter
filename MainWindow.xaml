@@ -17,21 +17,7 @@
             <ColumnDefinition Width="0.4*" />
         </Grid.ColumnDefinitions>
 
-        <ListView Grid.Row="0" Grid.Column="0" Margin="10 10">
-            <ListViewItem />
-            <ListViewItem />
-            <ListView.View>
-                <GridView>
-                    <GridViewColumn Header="Photo source">
-                        <GridViewColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="C:/Source/Photo01.jpg" />
-                            </DataTemplate>
-                        </GridViewColumn.CellTemplate>
-                    </GridViewColumn>
-                </GridView>
-            </ListView.View>
-        </ListView>
+        <ListBox Grid.Row="0" Grid.Column="0" Margin="10 10" />
 
         <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Vertical" Margin="10 10">
             <TextBlock Text="Destination:" />
@@ -41,15 +27,14 @@
                     <ColumnDefinition Width="auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBox Grid.Column="0" Text="VALIE" />
+                <TextBox Grid.Column="0" Text="{Binding TargetLocation}" />
                 <Button Grid.Column="1" Content="Search..." Margin="5 0" Padding="5 0" />
             </Grid>
 
             <TextBlock Text="Pattern:" />
-            <ComboBox Margin="0 5">
-                <ComboBoxItem Content="Data" />
-                <ComboBoxItem Content="Data i czas" />
-            </ComboBox>
+            <ComboBox Margin="0 5" 
+                      ItemsSource="{Binding RenameOptions}" 
+                      SelectedItem="{Binding SelectedRenameOption}" />
         </StackPanel>
 
         <Grid Grid.Row="1" Grid.Column="0" Margin="40 15">
