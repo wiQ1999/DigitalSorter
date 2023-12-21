@@ -6,10 +6,10 @@ namespace DigitalSorter.Models
 {
     public class Container
     {
-        private readonly List<string> _digitalSourcePaths;
+        private readonly HashSet<string> _digitalSourcePaths;
         private string _targetLocation;
 
-        public IReadOnlyList<string> DigitalSourcePaths => _digitalSourcePaths;
+        public IReadOnlySet<string> DigitalSourcePaths => _digitalSourcePaths;
 
         public NamingType RenameOption { get; set; }
 
@@ -25,7 +25,7 @@ namespace DigitalSorter.Models
 
         public Container()
         {
-            _digitalSourcePaths = new List<string>();
+            _digitalSourcePaths = new HashSet<string>();
             _targetLocation = default!;
             RenameOption = default!;
         }
@@ -47,7 +47,7 @@ namespace DigitalSorter.Models
 
             foreach (var digitalSourcePath in digitalSourcePaths)
             {
-                if (!digitalSourcePath.Contains(TargetLocation))
+                if (!_digitalSourcePaths.Contains(digitalSourcePath))
                 {
                     _digitalSourcePaths.Add(digitalSourcePath);
                     inserted++;
