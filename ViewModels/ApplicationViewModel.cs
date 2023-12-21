@@ -11,6 +11,8 @@ public class ApplicationViewModel : NotifyViewModel
 {
     private readonly Container _container;
 
+    public IEnumerable<string> Paths => _container.DigitalSourcePaths;
+
     public ObservableCollection<NamingType> RenameOptions { get; }
 
     public NamingType SelectedRenameOption
@@ -40,11 +42,13 @@ public class ApplicationViewModel : NotifyViewModel
             RenameOption = NamingType.None,
             TargetLocation = string.Empty
         };
+
         _container.AddDigitalSourcePaths(new string[] { "path01", "path02", "path03" });
 
         var renameOptionValues = Enum
             .GetValues<NamingType>()
             .SkipWhile(nt => nt == NamingType.None);
+
         RenameOptions = new ObservableCollection<NamingType>(renameOptionValues);
     }
 }

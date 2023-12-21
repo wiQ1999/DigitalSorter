@@ -17,7 +17,11 @@
             <ColumnDefinition Width="0.4*" />
         </Grid.ColumnDefinitions>
 
-        <ListBox Grid.Row="0" Grid.Column="0" Margin="10 10" />
+        <ListBox Grid.Row="0" Grid.Column="0" 
+                 Margin="10 10" 
+                 SelectionMode="Extended" 
+                 ItemsSource="{Binding Paths}" >
+        </ListBox>
 
         <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Vertical" Margin="10 10">
             <TextBlock Text="Destination:" />
