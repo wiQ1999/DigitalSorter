@@ -1,64 +1,48 @@
-# Założenia produktu — DigitalSorter
+# Założenia biznesowe — DigitalSorter
 
-**Wersja:** 0.1  
-**Podstawa:** analiza prototypu `wiQ1999/DigitalSorter` (gałąź `master`) oraz ustalenia biznesowe.
+**Wersja:** 0.2
 
-## Cel biznesowy
+## Cel produktu
 
-- Ułatwienie chronologicznego porządkowania zdjęć i filmów przechowywanych na Google Drive.
-- Ograniczenie kryterium sortowania wyłącznie do daty i czasu zapisanych w metadanych pliku.
-- Zapewnienie bezpiecznego, tylko do odczytu dostępu do materiałów użytkownika.
+- Chronologiczne przeglądanie zdjęć i filmów przechowywanych w wielu folderach Google Drive.
+- Zapewnienie dostępu do materiałów bez ich modyfikowania.
+- Udostępnienie aplikacji w przeglądarce oraz na Android TV.
 
-## Użytkownik i środowisko
+## Kanały dostępu
 
-- Użytkownikiem jest osoba posiadająca konto Google i dostęp do wskazanych folderów.
-- Aplikacja działa jako program desktopowy dla systemu Windows.
-- Do logowania, przeglądania folderów oraz odczytu plików wymagane jest połączenie z Internetem.
-- Brak połączenia z Internetem uniemożliwia wykonanie pełnego procesu.
+- Aplikacja przeglądarkowa — technologia i framework do ustalenia.
+- Aplikacja Android TV — warstwa prezentacji oparta na .NET MAUI.
 
 ## Zakres funkcjonalny
 
-- Logowanie do Google Drive za zgodą użytkownika.
-- Wybór jednego lub wielu folderów źródłowych.
-- Odczyt listy zdjęć i filmów z wybranych folderów.
-- Eliminowanie wielokrotnie wskazanych, identycznych źródeł.
-- Odczyt metadanych plików bez ich trwałego pobierania.
-- Ustalenie daty i czasu wykonania materiału na podstawie metadanych, np. EXIF `DateTimeOriginal`.
-- Sortowanie materiałów wyłącznie według ustalonej daty i czasu.
-- Prezentowanie plików bez poprawnych metadanych jako nierozpoznanych; bez używania daty modyfikacji Google Drive jako zamiennika.
-- Informowanie o plikach pominiętych, nieobsługiwanych lub niedostępnych.
+- Logowanie do konta Google za zgodą użytkownika.
+- Wybór jednego lub wielu folderów Google Drive.
+- Prezentowanie zdjęć i filmów na wspólnej osi czasu.
+- Sortowanie od najstarszego do najnowszego materiału.
+- Wyświetlanie wyłącznie plików z poprawnie rozpoznaną datą i czasem wykonania.
+- Tryb podstawowy: aktualny materiał oraz miniatury kilku następnych.
+- Tryb pełnoekranowy: aktualny materiał oraz przechodzenie do poprzedniego i następnego pliku.
+- Informowanie o plikach niedostępnych lub nieobsługiwanych.
+
+## Reguły porządkowania
+
+- Podstawą kolejności jest data i czas wykonania zapisane w metadanych.
+- Data przesłania, utworzenia lub modyfikacji w Google Drive nie zastępuje daty z metadanych.
+- Nazwa, typ, rozmiar, lokalizacja GPS i zawartość pliku nie wpływają na kolejność.
+- Pliki bez wiarygodnej daty i czasu nie są wyświetlane.
 
 ## Bezpieczeństwo danych
 
-- Dostęp do Google Drive odbywa się w trybie tylko do odczytu.
-- Aplikacja nie tworzy, nie nadpisuje, nie przenosi, nie usuwa ani nie zmienia nazw plików i folderów na Google Drive.
-- Aplikacja nie modyfikuje metadanych.
-- Dane plików i odczytane metadane nie są trwale zapisywane przez aplikację.
-- Uprawnienia Google są ograniczone do minimalnego zakresu potrzebnego do odczytu.
-- Dane logowania i tokeny dostępu są chronione zgodnie z mechanizmami systemu operacyjnego.
-
-## Reguły sortowania
-
-- Podstawą kolejności jest data i czas wykonania zapisane w metadanych.
-- Nazwa pliku, data przesłania oraz data utworzenia lub modyfikacji w Google Drive nie wpływają na kolejność.
-- Lokalizacja GPS, zawartość obrazu i inne metadane nie wpływają na kolejność.
-- Dla zdjęć i filmów obowiązuje jedna, wspólna oś czasu.
-- Pliki bez wiarygodnej daty i czasu nie są automatycznie umieszczane na osi czasu.
+- Dostęp do Google Drive jest ograniczony do odczytu.
+- Aplikacja nie przechowuje hasła użytkownika.
+- Token dostępu jest przechowywany lokalnie na urządzeniu i przesyłany wyłącznie do usług Google.
+- Aplikacja nie modyfikuje plików, folderów ani metadanych.
 
 ## Poza zakresem
 
 - Praca offline.
-- Zmiana struktury folderów na Google Drive.
-- Kopiowanie lub eksportowanie plików do lokalnego katalogu.
-- Zmiana nazw plików według daty, czasu lub lokalizacji.
-- Sortowanie według lokalizacji, nazwy, typu, rozmiaru lub treści.
-- Edycja i uzupełnianie brakujących metadanych.
-- Rozpoznawanie osób, obiektów lub zdarzeń na zdjęciach i filmach.
-
-## Założenia techniczne wynikające z prototypu
-
-- Technologia: WPF, .NET 7, architektura zbliżona do MVVM.
-- Biblioteka odczytu metadanych: `MetadataExtractor` 2.8.1.
-- Obecny prototyp odczytuje datę i czas wykonania z EXIF dla pliku wskazanego ścieżką lokalną.
-- Integracja Google Drive, obsługa filmów, wybór folderów i właściwy proces sortowania wymagają implementacji.
-- Dostępne w kodzie warianty nazewnictwa i lokalizacji nie należą do przyjętego zakresu biznesowego.
+- Tworzenie, kopiowanie, przenoszenie, usuwanie i zmiana nazw plików lub folderów.
+- Eksportowanie materiałów do lokalnego katalogu.
+- Edycja lub uzupełnianie metadanych.
+- Sortowanie według innych kryteriów.
+- Rozpoznawanie osób, obiektów lub zdarzeń.
