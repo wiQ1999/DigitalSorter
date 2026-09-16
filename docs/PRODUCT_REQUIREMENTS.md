@@ -9,7 +9,7 @@
 
 ## Kanały dostępu
 
-- Aplikacja przeglądarkowa — technologia i framework do ustalenia.
+- Aplikacja przeglądarkowa — standalone Blazor WebAssembly hostowany na GitHub Pages projektu.
 - Aplikacja Android TV — warstwa prezentacji oparta na .NET MAUI.
 
 ## Przetwarzanie materiałów
