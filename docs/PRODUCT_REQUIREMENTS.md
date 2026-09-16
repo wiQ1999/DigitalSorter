@@ -1,6 +1,6 @@
 # Wymagania produktowe — DigitalSorter
 
-**Wersja:** 0.3
+**Wersja:** 0.4
 
 ## Cel produktu
 
@@ -11,6 +11,12 @@
 
 - Aplikacja przeglądarkowa — standalone Blazor WebAssembly hostowany na GitHub Pages projektu.
 - Aplikacja Android TV — warstwa prezentacji oparta na .NET MAUI.
+
+## Obsługiwane formaty
+
+- Zdjęcia: JPEG (`.jpg`, `.jpeg`), PNG (`.png`), WebP (`.webp`) oraz HEIC/HEIF (`.heic`, `.heif`).
+- Wideo: MP4 (`.mp4`), WebM (`.webm`) oraz MOV (`.mov`).
+- Pliki w pozostałych formatach są pomijane i nie trafiają na listę materiałów niepoprawnych.
 
 ## Przetwarzanie materiałów
 
