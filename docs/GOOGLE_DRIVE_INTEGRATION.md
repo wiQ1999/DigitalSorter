@@ -3,10 +3,11 @@
 ## Dostęp i uwierzytelnianie
 
 - Aplikacja wymaga połączenia z Internetem.
-- Użytkownik uwierzytelnia się bezpośrednio w usługach Google.
-- Aplikacja nie przechowuje hasła użytkownika.
-- Token dostępu jest przechowywany lokalnie na urządzeniu i przesyłany wyłącznie do usług Google.
-- Zakres uprawnień jest ograniczony do niezbędnego odczytu.
+- Użytkownik uwierzytelnia się bezpośrednio w usługach Google; aplikacja nie przechowuje loginu ani hasła.
+- Aplikacja webowa używa Google OAuth 2.0 Authorization Code Flow z `access_type=offline` i zakresem `drive.readonly`.
+- Backend OAuth przechowuje zaszyfrowany `refresh_token` i automatycznie uzyskuje nowe `access_tokeny`, dopóki autoryzacja użytkownika pozostaje ważna.
+- `access_token` jest przekazywany do aplikacji webowej, przechowywany wyłącznie w pamięci i używany bezpośrednio do wywołań Google Drive API.
+- Backend nie pośredniczy w pobieraniu zdjęć ani filmów z Google Drive.
 
 ## Źródła danych
 
@@ -20,3 +21,4 @@
 
 - Integracja nie tworzy, nie nadpisuje, nie przenosi, nie usuwa ani nie zmienia nazw plików i folderów.
 - Integracja nie modyfikuje metadanych.
+- Unieważnienie lub wygaśnięcie trwałej autoryzacji wymaga ponownego połączenia konta Google.
