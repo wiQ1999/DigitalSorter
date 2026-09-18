@@ -1,6 +1,6 @@
 # Wymagania produktowe — DigitalSorter
 
-**Wersja:** 0.5
+**Wersja:** 0.6
 
 ## Cel produktu
 
@@ -9,7 +9,7 @@
 
 ## Kanały dostępu
 
-- Aplikacja przeglądarkowa — standalone Blazor WebAssembly hostowany na GitHub Pages projektu, korzystający z osobnego backendu wyłącznie do uwierzytelniania i zarządzania tokenami Google.
+- Aplikacja przeglądarkowa — standalone Blazor WebAssembly hostowany na GitHub Pages projektu; interfejs wykorzystuje Razor Components, HTML5 i CSS, a JavaScript jest ograniczony do niezbędnego interopu z funkcjami przeglądarki i bibliotekami zewnętrznymi. Osobny backend służy wyłącznie do uwierzytelniania i zarządzania tokenami Google.
 - Aplikacja Android TV — warstwa prezentacji oparta na .NET MAUI.
 
 ## Obsługiwane formaty
