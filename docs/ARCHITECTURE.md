@@ -26,6 +26,10 @@
 ## Aplikacja webowa
 
 - `DigitalSorter.Web` jest aplikacją standalone Blazor WebAssembly wykonywaną po stronie przeglądarki.
+- Interfejs jest budowany z Razor Components (`.razor`) i HTML5; zdjęcia i filmy są prezentowane przez natywne elementy przeglądarki.
+- Stylowanie wykorzystuje CSS, w tym CSS isolation dla stylów przypisanych do komponentów.
+- Logika interfejsu i stan aplikacji są realizowane przede wszystkim w C#; JavaScript jest ograniczony do niewielkich modułów wywoływanych przez JS interop, gdy wymagają tego API przeglądarki lub biblioteki zewnętrzne.
+- TypeScript ani dodatkowy framework JavaScript nie są częścią podstawowego stosu technologicznego.
 - Opublikowane pliki statyczne są hostowane przez GitHub Pages projektu.
 - `DigitalSorter.Auth` działa jako niezależny backend OAuth/token broker; nie hostuje interfejsu ani logiki biznesowej Core.
 - Wywołania Google Drive są wykonywane bezpośrednio z przeglądarki, dlatego zdjęcia i filmy nie przechodzą przez backend.
