@@ -54,7 +54,7 @@ scripts/verify.sh
 
 Domyślnie testy używają Google Chrome z kodekiem H.264. `TEST_CHROMIUM` wskazuje opcjonalny lokalny plik przeglądarki z tym kodekiem. Wyniki, pokrycie i zrzuty trafiają do `test-results/`. Regeneracja mediów: `tests/fixtures/generate.py` z Pillow 11.3.0, pillow-heif 1.1.0 i ffmpeg.
 
-Test natywny: `scripts/test-native-tv.sh`, uruchomiony emulator oraz artefakt `native-tv-fixture` z CI. Tymczasowy CA jest dodawany przez `DigitalSorterTestCertificate` tylko do Debug; Release odrzuca ten parametr. Domyślne APK nie zawierają testowego CA.
+Test natywny: `npx playwright install android`, `scripts/test-native-tv.sh`, uruchomiony emulator oraz artefakt `native-tv-fixture` z CI. Tymczasowy CA jest dodawany przez `DigitalSorterTestCertificate` tylko do Debug; Release odrzuca ten parametr. Domyślne APK nie zawierają testowego CA.
 
 ## Wdrożenie
 

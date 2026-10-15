@@ -103,6 +103,7 @@ jobs:
           path: test-results/native-fixture
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chrome
+      - run: npx playwright install android
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
