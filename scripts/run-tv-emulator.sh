@@ -24,9 +24,9 @@ export ANDROID_SERIAL="$serial"
 emulator_pid=
 cleanup() {
   local result=$?
-  adb -s "$serial" logcat -d >test-results/native-emulator-logcat.txt 2>&1 || true
-  adb -s "$serial" emu kill >/dev/null 2>&1 || true
-  if [[ -n "$emulator_pid" ]]; then kill "$emulator_pid" 2>/dev/null || true; wait "$emulator_pid" 2>/dev/null || true; fi
+  timeout 15s adb -s "$serial" logcat -d >test-results/native-emulator-logcat.txt 2>&1 || true
+  timeout 5s adb -s "$serial" emu kill >/dev/null 2>&1 || true
+  if [[ -n "$emulator_pid" ]]; then kill -KILL "$emulator_pid" 2>/dev/null || true; wait "$emulator_pid" 2>/dev/null || true; fi
   rm -rf "$emulator_state_dir"
   exit "$result"
 }

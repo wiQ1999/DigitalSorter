@@ -2,9 +2,55 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { X509Certificate, createHash } from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { setTimeout as delay } from "node:timers/promises";
 import { _android, chromium } from "playwright";
 
 const app = "pl.wiq1999.digitalsorter.androidtv";
+const execute = promisify(execFile);
+async function adb(...args) {
+  return (await execute("adb", args, { timeout: 20000 })).stdout;
+}
+
+async function tapNativeControl(id) {
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
+    await adb("shell", "uiautomator", "dump", "/sdcard/digitalsorter-ui.xml");
+    const xml = await adb("exec-out", "cat", "/sdcard/digitalsorter-ui.xml");
+    writeFileSync("test-results/native-ui.txt", xml);
+    for (const [node] of xml.matchAll(/<node\b[^>]*>/g)) {
+      const attributes = Object.fromEntries(
+        [...node.matchAll(/([\w:-]+)="([^"]*)"/g)].map((match) => [
+          match[1],
+          match[2],
+        ]),
+      );
+      if (
+        attributes["content-desc"] !== id &&
+        attributes["resource-id"] !== id &&
+        !attributes["resource-id"]?.endsWith(":id/" + id)
+      )
+        continue;
+      const bounds = attributes.bounds?.match(
+        /^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/,
+      );
+      assert.ok(bounds, "Native control must have screen bounds: " + id);
+      const [, left, top, right, bottom] = bounds.map(Number);
+      await adb(
+        "shell",
+        "input",
+        "tap",
+        String((left + right) / 2),
+        String((top + bottom) / 2),
+      );
+      return;
+    }
+    await delay(500);
+  }
+  assert.fail("Native control was not visible: " + id);
+}
+
 const certificate = new X509Certificate(
   readFileSync(process.env.TEST_CERTIFICATE_PEM),
 );
@@ -52,11 +98,13 @@ test(
     try {
       await device.shell(`pm clear ${app}`);
       await launch();
-      await device.wait({ desc: "broker-origin" });
-      await device.fill({ desc: "broker-origin" }, "https://10.0.2.2:7443");
+      console.log("Configuring the server through the native Android screen");
+      await tapNativeControl("broker-origin");
+      await adb("shell", "input", "text", "https://10.0.2.2:7443");
       await device.shell("input keyevent KEYCODE_ESCAPE");
-      await device.tap({ desc: "open-broker" });
+      await tapNativeControl("open-broker");
       page = await attach();
+      console.log("Approving the TV from the controlled phone browser");
       await page.getByRole("button", { name: "Połącz przez telefon" }).click();
       const code = (await page.locator(".pair-code").innerText()).trim();
       assert.match(code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
@@ -80,6 +128,9 @@ test(
       await launch();
       page = await attach();
       await page.getByRole("heading", { name: "Twoje źródła" }).waitFor();
+      console.log(
+        "Native SecureStorage restored the session after process restart",
+      );
       await page.getByRole("checkbox").first().check();
       await page.getByRole("button", { name: "Otwórz kolekcję" }).click();
       await page.waitForFunction(
@@ -134,6 +185,7 @@ test(
       await page
         .getByRole("button", { name: "Połącz przez telefon" })
         .waitFor();
+      console.log("Native logout cleared the persisted session");
       assert.deepEqual(errors, []);
       writeFileSync(
         "test-results/native-tv-result.json",
