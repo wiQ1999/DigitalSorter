@@ -37,6 +37,7 @@ public sealed class BrowserFactory : BrokerFactory
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
+        builder.UseSetting("AllowedHosts", "localhost;127.0.0.1;10.0.2.2");
         if (Environment.GetEnvironmentVariable("TEST_WEB_ROOT") is { Length: > 0 } publishedRoot)
         {
             builder.UseWebRoot(Path.GetFullPath(publishedRoot));
@@ -69,6 +70,12 @@ public sealed class ControlledEndpoints(ControlledGoogle google, string origin, 
         app.Use(async (context, continueRequest) =>
         {
             var path = context.Request.Path.Value ?? "";
+            var clientOrigin = context.Request.Scheme + "://" + context.Request.Host;
+            if (path == "/api/client-config")
+            {
+                await context.Response.WriteAsJsonAsync(new { DriveFilesEndpoint = clientOrigin + "/test-drive/files" });
+                return;
+            }
             if (path == "/test-oauth/authorize")
             {
                 var authorizationUrl = origin + path + context.Request.QueryString;
@@ -104,7 +111,7 @@ public sealed class ControlledEndpoints(ControlledGoogle google, string origin, 
             var id = path.Split('/').Last(); var spec = Files.SingleOrDefault(x => x.Id == id);
             if (spec is null || !spec.Available) { context.Response.StatusCode = 404; return; }
             if (context.Request.Query.ContainsKey("fields"))
-            { await context.Response.WriteAsJsonAsync(new { thumbnailLink = origin + "/test-drive/thumb/" + id }); return; }
+            { await context.Response.WriteAsJsonAsync(new { thumbnailLink = clientOrigin + "/test-drive/thumb/" + id }); return; }
             var fixture = path.Contains("/thumb/") ? "landscape.jpg" : spec.Fixture;
             var bytes = await File.ReadAllBytesAsync(Path.Combine(fixturePath, fixture));
             context.Response.ContentType = path.Contains("/thumb/") ? "image/jpeg" : spec.Mime;

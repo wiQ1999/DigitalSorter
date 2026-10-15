@@ -4,6 +4,7 @@
     <TargetFramework>net10.0-android</TargetFramework>
     <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
     <OutputType>Exe</OutputType>
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
     <RootNamespace>DigitalSorter.AndroidTV</RootNamespace>
     <UseMaui>true</UseMaui>
     <SingleProject>true</SingleProject>
@@ -25,5 +26,14 @@
     <MauiIcon Include="Resources\AppIcon\appicon.svg" />
     <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#000000" BaseSize="128,128" />
   </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'Debug' and '$(DigitalSorterTestCertificate)' != ''">
+    <AndroidManifestOverlay Include="../../tests/native/AndroidManifest.xml" />
+    <AndroidResource Include="$(DigitalSorterTestCertificate)" LogicalName="raw/digitalsorter_test_ca.pem" />
+    <AndroidResource Include="../../tests/native/network_security_config.xml" LogicalName="xml/digitalsorter_test_network.xml" />
+  </ItemGroup>
+  <Target Name="RejectReleaseTestCertificate" BeforeTargets="PrepareForBuild" Condition="'$(Configuration)' != 'Debug' and '$(DigitalSorterTestCertificate)' != ''">
+    <Error Text="A controlled test certificate is allowed only in Debug builds." />
+  </Target>
 
 </Project>

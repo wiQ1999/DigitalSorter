@@ -49,10 +49,12 @@ scripts/verify.sh
 - Jednostkowe: deterministyczne reguły Core; wymagane ≥80% linii i gałęzi.
 - Integracyjne: SQLite, trwałe sesje, szyfrowanie, OIDC z podpisami RSA i PKCE, tokeny, parowanie, publiczny adapter Drive i prawdziwe kontenery multimediów.
 - Przeglądarkowe: opublikowany WebAssembly, kontrolowany OAuth/Drive, Web i kontrakt adaptera TV, odtwarzanie, szukanie w filmie, HEIC/HEIF, nawigacja, pełny ekran, dynamiczne tło i układ mobilny.
-- Natywne TV: przed wydaniem sprawdź APK na urządzeniu lub emulatorze z KVM — start, pilot, parowanie, restart i `SecureStorage`. Test mostka w Chromium nie zastępuje tej próby.
+- Natywne TV: osobny job CI uruchamia APK na emulatorze Android TV z KVM — start, parowanie, rzeczywisty `SecureStorage`, restart, formaty mediów i pilot. Wyniki zawierają zrzuty ekranu i logcat.
 - Dane testowe są syntetyczne; testy nie wymagają konta Google. `Testing` i host kontrolowanego OAuth służą wyłącznie testom i nie są częścią obrazu produkcyjnego.
 
 Domyślnie testy używają Google Chrome z kodekiem H.264. `TEST_CHROMIUM` wskazuje opcjonalny lokalny plik przeglądarki z tym kodekiem. Wyniki, pokrycie i zrzuty trafiają do `test-results/`. Regeneracja mediów: `tests/fixtures/generate.py` z Pillow 11.3.0, pillow-heif 1.1.0 i ffmpeg.
+
+Test natywny: `scripts/test-native-tv.sh`, uruchomiony emulator oraz artefakt `native-tv-fixture` z CI. Tymczasowy CA jest dodawany przez `DigitalSorterTestCertificate` tylko do Debug; Release odrzuca ten parametr. Domyślne APK nie zawierają testowego CA.
 
 ## Wdrożenie
 

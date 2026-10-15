@@ -15,11 +15,11 @@ public sealed class MainPage : ContentPage
 
     private void Configure()
     {
-        var address = new Entry { Placeholder = "https://twoj-serwer.pl", TextColor = Colors.White,
+        var address = new Entry { AutomationId = "broker-origin", Placeholder = "https://twoj-serwer.pl", TextColor = Colors.White,
             PlaceholderColor = Color.FromArgb("#8a98ab"), Keyboard = Keyboard.Url, MinimumWidthRequest = 500,
             Text = Preferences.Default.Get("broker-origin", "") };
         var error = new Label { TextColor = Color.FromArgb("#ffb69a") };
-        var connect = new Button { Text = "Otwórz DigitalSorter →", BackgroundColor = Color.FromArgb("#7ba7ff"),
+        var connect = new Button { AutomationId = "open-broker", Text = "Otwórz DigitalSorter →", BackgroundColor = Color.FromArgb("#7ba7ff"),
             TextColor = Color.FromArgb("#0b1730"), CornerRadius = 12, Padding = new Thickness(24, 15) };
         connect.Clicked += (_, _) =>
         {
