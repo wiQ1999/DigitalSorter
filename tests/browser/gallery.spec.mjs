@@ -471,3 +471,72 @@ test(
     }
   },
 );
+
+test(
+  "Phone: revoked Google authorization requires consent and preserves the TV code",
+  { timeout: 150000 },
+  async () => {
+    const tv = await context(true);
+    const phone = await context();
+    const tvPage = await tv.ctx.newPage();
+    const phonePage = await phone.ctx.newPage();
+    async function mode(value) {
+      await phonePage.evaluate(async (mode) => {
+        const response = await fetch("/test-oauth/control", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode }),
+        });
+        if (!response.ok)
+          throw new Error("Controlled OAuth configuration failed");
+      }, value);
+    }
+    try {
+      await login(phonePage);
+      await tvPage.goto(origin);
+      await tvPage
+        .getByRole("button", { name: "Połącz przez telefon" })
+        .click();
+      const code = (await tvPage.locator(".pair-code").innerText()).trim();
+      await phonePage.goto(origin + "/pair?code=" + code);
+      await phonePage
+        .getByRole("button", { name: "Zatwierdź telewizor" })
+        .waitFor();
+      await mode("revoked");
+      await phonePage
+        .getByRole("button", { name: "Zatwierdź telewizor" })
+        .click();
+      const loginLink = phonePage.getByRole("link", {
+        name: "Połącz konto Google",
+      });
+      await loginLink.waitFor();
+      assert.equal(await phonePage.locator("#pair-code").inputValue(), code);
+      assert.match(await loginLink.getAttribute("href"), /consent=true/);
+      await mode("normal");
+      await loginLink.click();
+      assert.equal(
+        new URL(phonePage.url()).searchParams.get("prompt"),
+        "consent",
+      );
+      await phonePage
+        .getByRole("button", { name: "Zatwierdź dostęp testowy" })
+        .click();
+      assert.equal(await phonePage.locator("#pair-code").inputValue(), code);
+      await phonePage
+        .getByRole("button", { name: "Zatwierdź telewizor" })
+        .click();
+      await tvPage.getByRole("heading", { name: "Twoje źródła" }).waitFor();
+      assert.equal(tv.storage.get("session")?.length, 64);
+      assert.deepEqual(phone.errors, []);
+      assert.deepEqual(tv.errors, []);
+      results.push({
+        name: "phone-reauthorization-preserves-tv-pairing",
+        passed: true,
+      });
+    } finally {
+      await mode("normal").catch(() => {});
+      await tv.ctx.close();
+      await phone.ctx.close();
+    }
+  },
+);

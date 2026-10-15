@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using QRCoder;
@@ -120,14 +121,14 @@ builder.Services.AddAuthentication(o =>
         var subject = principal.FindFirstValue("sub")!;
         var scopes = c.Properties!.Items.TryGetValue("granted_scopes", out var grantedScopes) ? grantedScopes ?? "" : "";
         if (!scopes.Split(' ').Contains("https://www.googleapis.com/auth/drive.readonly"))
-        { c.Response.Redirect("/?error=permission"); c.HandleResponse(); return; }
+        { c.Response.Redirect(FailureRedirect(c.ReturnUri, "permission")); c.HandleResponse(); return; }
         try
         {
             await c.HttpContext.RequestServices.GetRequiredService<GoogleTokens>().SaveAsync(subject,
                 principal.FindFirstValue("name") ?? "Konto Google", c.Properties.GetTokenValue("refresh_token"), scopes, ct);
         }
         catch (GoogleAuthorizationRequiredException)
-        { c.Response.Redirect("/?error=consent"); c.HandleResponse(); return; }
+        { c.Response.Redirect(FailureRedirect(c.ReturnUri, "consent")); c.HandleResponse(); return; }
         var db = c.HttpContext.RequestServices.GetRequiredService<BrokerDb>();
         var session = new BrokerSession { Id = SecretCipher.RandomSecret(), Subject = subject,
             ExpiresAt = c.HttpContext.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().AddDays(30) };
@@ -138,7 +139,7 @@ builder.Services.AddAuthentication(o =>
         c.Properties.IsPersistent = true;
         c.Properties.ExpiresUtc = session.ExpiresAt;
     };
-    o.Events.OnRemoteFailure = c => { c.Response.Redirect("/?error=oauth"); c.HandleResponse(); return Task.CompletedTask; };
+    o.Events.OnRemoteFailure = c => { c.Response.Redirect(FailureRedirect(c.Properties?.RedirectUri, "oauth")); c.HandleResponse(); return Task.CompletedTask; };
 });
 builder.Services.AddRateLimiter(o =>
 {
@@ -194,9 +195,14 @@ app.MapGet("/auth/login", (HttpContext c, string? returnUrl, bool? consent) =>
     if (consent == true) props.Items["consent"] = "true";
     return Results.Challenge(props, ["Google"]);
 }).RequireRateLimiting("login");
-app.MapGet("/api/session", (HttpContext c, IAntiforgery csrf) => Results.Ok(new SessionInfo(
-    c.User.Identity?.IsAuthenticated == true, c.User.Identity?.Name, c.User.Identity?.AuthenticationType == "Device",
-    csrf.GetAndStoreTokens(c).RequestToken)));
+app.MapGet("/api/session", async (HttpContext c, IAntiforgery csrf, BrokerDb db, CancellationToken ct) =>
+{
+    var authenticated = c.User.Identity?.IsAuthenticated == true;
+    var subject = c.User.FindFirstValue("sub");
+    var reauthorize = authenticated && !await db.Accounts.AnyAsync(x => x.Subject == subject && !x.NeedsAuthorization && x.ClientId == google.ClientId, ct);
+    return Results.Ok(new SessionInfo(authenticated, c.User.Identity?.Name, c.User.Identity?.AuthenticationType == "Device",
+        csrf.GetAndStoreTokens(c).RequestToken, reauthorize));
+});
 app.MapPost("/api/pair/start", async (PairingRequest request, PairingService pairs, CancellationToken ct) =>
     Results.Ok(await pairs.StartAsync(request.DeviceName, ct))).RequireRateLimiting("pair-start");
 app.MapPost("/api/pair/poll", async (PairingPoll request, PairingService pairs, CancellationToken ct) =>
@@ -225,8 +231,12 @@ var secured = app.MapGroup("/api").RequireAuthorization().AddEndpointFilter(asyn
     catch (GoogleServiceUnavailableException) { return Results.Problem("Google jest chwilowo niedostępne. Spróbuj ponownie.", statusCode: 503); }
 });
 secured.MapPost("/token", async (HttpContext c, bool? force, GoogleTokens tokens, CancellationToken ct) => Results.Ok(await tokens.GetAsync(c.User.FindFirstValue("sub")!, ct, force == true)));
-secured.MapPost("/pair/confirm", async (PairingConfirmation request, HttpContext c, PairingService pairs, CancellationToken ct) =>
-    await pairs.ApproveAsync(request.Code, c.User.FindFirstValue("sub")!, ct) ? Results.Ok() : Results.Conflict()).RequireRateLimiting("pair-confirm");
+secured.MapPost("/pair/confirm", async (PairingConfirmation request, HttpContext c, PairingService pairs, GoogleTokens tokens, CancellationToken ct) =>
+{
+    var subject = c.User.FindFirstValue("sub")!;
+    await tokens.GetAsync(subject, ct, force: true);
+    return await pairs.ApproveAsync(request.Code, subject, ct) ? Results.Ok() : Results.Conflict();
+}).RequireRateLimiting("pair-confirm");
 secured.MapPost("/logout", async (HttpContext c, BrokerDb db, CancellationToken ct) =>
 {
     var id = c.User.FindFirstValue("ds_session");
@@ -244,5 +254,9 @@ app.Map("/api/{**path}", () => Results.NotFound());
 app.Map("/auth/{**path}", () => Results.NotFound());
 app.MapFallbackToFile("index.html");
 app.Run();
+
+static string FailureRedirect(string? target, string error) =>
+    target is not null && target.StartsWith("/pair?", StringComparison.Ordinal)
+        ? QueryHelpers.AddQueryString(target, "error", error) : "/?error=" + error;
 
 public partial class Program;

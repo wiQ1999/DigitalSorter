@@ -123,9 +123,9 @@ public class BrokerFactory : WebApplicationFactory<Program>
         });
     }
     public HttpClient Client() => CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new("https://localhost"), AllowAutoRedirect = false });
-    public async Task<HttpResponseMessage> Login(HttpClient client, string subject = "controlled-user", bool consent = false)
+    public async Task<HttpResponseMessage> Login(HttpClient client, string subject = "controlled-user", bool consent = false, string returnUrl = "/")
     {
-        var challenge = await client.GetAsync("/auth/login" + (consent ? "?consent=true" : ""));
+        var challenge = await client.GetAsync("/auth/login?returnUrl=" + Uri.EscapeDataString(returnUrl) + (consent ? "&consent=true" : ""));
         var location = challenge.Headers.Location ?? throw new InvalidOperationException("OAuth challenge missing: " + await challenge.Content.ReadAsStringAsync());
         var query = QueryHelpers.ParseQuery(location.Query);
         var code = Google.Authorize(location, subject);

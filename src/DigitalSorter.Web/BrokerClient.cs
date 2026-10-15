@@ -84,6 +84,7 @@ public sealed class BrokerClient(HttpClient http, IJSRuntime js, DriveOptions dr
     public async Task<bool> ConfirmAsync(string code)
     {
         using var response = await SendAsync(HttpMethod.Post, "api/pair/confirm", new PairingConfirmation(code));
+        if (response.StatusCode == HttpStatusCode.Unauthorized) await InitializeAsync();
         return response.IsSuccessStatusCode;
     }
     public async Task SignOutAsync(bool disconnect)

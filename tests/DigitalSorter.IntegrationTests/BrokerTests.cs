@@ -94,6 +94,18 @@ public sealed class BrokerTests
         Assert.False((await Session(client)).Authenticated);
     }
     [Fact]
+    public async Task PhoneConsentRecoveryPreservesTheTelevisionPairingCode()
+    {
+        using var factory = new BrokerFactory(); using var client = factory.Client();
+        factory.Google.IncludeRefresh = false;
+        var response = await factory.Login(client, returnUrl: "/pair?code=ABCD2345");
+        Assert.Equal("/pair?code=ABCD2345&error=consent", response.Headers.Location!.OriginalString);
+        factory.Google.IncludeRefresh = true;
+        response = await factory.Login(client, consent: true, returnUrl: "/pair?code=ABCD2345");
+        Assert.Equal("/pair?code=ABCD2345", response.Headers.Location!.OriginalString);
+        Assert.False((await Session(client)).GoogleAuthorizationRequired);
+    }
+    [Fact]
     public async Task TokenRequiresAuthenticationAndCsrfForBrowser()
     {
         using var factory = new BrokerFactory(); using var client = factory.Client();
@@ -111,6 +123,7 @@ public sealed class BrokerTests
         using var factory = new BrokerFactory(); using var client = factory.Client();
         await factory.Login(client); await Session(client); factory.Google.RefreshError = "invalid_grant";
         Assert.Equal(HttpStatusCode.Unauthorized, (await Post(client, "/api/token")).StatusCode);
+        Assert.True((await Session(client)).GoogleAuthorizationRequired);
         factory.Google.IncludeRefresh = false;
         var response = await factory.Login(client);
         Assert.Contains("error=consent", response.Headers.Location!.OriginalString);
@@ -240,6 +253,17 @@ public sealed class BrokerTests
         Assert.Equal(HttpStatusCode.Conflict, (await phone.PostAsJsonAsync("/api/pair/confirm", new PairingConfirmation(pair.UserCode))).StatusCode);
         var result = await (await tv.PostAsJsonAsync("/api/pair/poll", new PairingPoll(pair.Id, pair.DeviceSecret))).Content.ReadFromJsonAsync<PairingResult>();
         Assert.Equal("expired", result!.Status);
+    }
+    [Fact]
+    public async Task PhoneCannotApproveATelevisionAfterGoogleRevokesAuthorization()
+    {
+        using var factory = new BrokerFactory(); using var tv = factory.Client(); using var phone = factory.Client();
+        var pair = (await (await tv.PostAsJsonAsync("/api/pair/start", new PairingRequest("TV"))).Content.ReadFromJsonAsync<PairingStarted>())!;
+        await factory.Login(phone); await Session(phone); factory.Google.RefreshError = "invalid_grant";
+        Assert.Equal(HttpStatusCode.Unauthorized, (await phone.PostAsJsonAsync("/api/pair/confirm", new PairingConfirmation(pair.UserCode))).StatusCode);
+        Assert.True((await Session(phone)).GoogleAuthorizationRequired);
+        var result = await (await tv.PostAsJsonAsync("/api/pair/poll", new PairingPoll(pair.Id, pair.DeviceSecret))).Content.ReadFromJsonAsync<PairingResult>();
+        Assert.Equal("pending", result!.Status); Assert.Null(result.DeviceToken);
     }
     [Fact]
     public async Task PairingStartsAreRateLimitedAndMalformedJsonIsRejected()

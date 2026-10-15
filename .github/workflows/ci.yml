@@ -92,14 +92,8 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           test -c /dev/kvm
-      - uses: reactivecircus/android-emulator-runner@v2.38.0
-        with:
-          api-level: 36
-          target: android-tv
-          arch: x86_64
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics
-          script: scripts/test-native-tv.sh
+      - name: Boot Android TV and run the native scenario
+        run: scripts/run-tv-emulator.sh
       - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:

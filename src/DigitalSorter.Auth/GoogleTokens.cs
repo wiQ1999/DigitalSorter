@@ -74,7 +74,11 @@ public sealed class GoogleTokens(BrokerDb db, SecretCipher cipher, IHttpClientFa
             }
             var root = json.RootElement;
             if (root.TryGetProperty("scope", out var granted) && !granted.GetString()!.Split(' ').Contains("https://www.googleapis.com/auth/drive.readonly"))
+            {
+                await db.Accounts.Where(x => x.Subject == subject).ExecuteUpdateAsync(s => s.SetProperty(x => x.NeedsAuthorization, true), ct);
+                cache.Remove("google:" + subject);
                 throw new GoogleAuthorizationRequiredException();
+            }
             var token = new TokenResponse(root.GetProperty("access_token").GetString()!, clock.GetUtcNow().AddSeconds(root.GetProperty("expires_in").GetInt32()));
             if (root.TryGetProperty("refresh_token", out var rotated) && !string.IsNullOrEmpty(rotated.GetString()))
             {

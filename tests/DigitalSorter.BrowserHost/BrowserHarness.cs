@@ -70,6 +70,16 @@ public sealed class ControlledEndpoints(ControlledGoogle google, string origin, 
         app.Use(async (context, continueRequest) =>
         {
             var path = context.Request.Path.Value ?? "";
+            if (path == "/test-oauth/control" && context.Request.Method == "POST")
+            {
+                using var body = await JsonDocument.ParseAsync(context.Request.Body);
+                var mode = body.RootElement.GetProperty("mode").GetString();
+                if (mode is not ("normal" or "revoked" or "missing-refresh")) { context.Response.StatusCode = 400; return; }
+                google.RefreshError = mode == "revoked" ? "invalid_grant" : null;
+                google.IncludeRefresh = mode != "missing-refresh";
+                context.Response.StatusCode = 204;
+                return;
+            }
             var clientOrigin = context.Request.Scheme + "://" + context.Request.Host;
             if (path == "/api/client-config")
             {

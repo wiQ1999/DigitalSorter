@@ -1,6 +1,6 @@
 namespace DigitalSorter.Contracts;
 
-public sealed record SessionInfo(bool Authenticated, string? DisplayName = null, bool Device = false, string? CsrfToken = null);
+public sealed record SessionInfo(bool Authenticated, string? DisplayName = null, bool Device = false, string? CsrfToken = null, bool GoogleAuthorizationRequired = false);
 public sealed record TokenResponse(string AccessToken, DateTimeOffset ExpiresAt);
 public sealed record PairingRequest(string DeviceName);
 public sealed record PairingStarted(string Id, string UserCode, string DeviceSecret, string VerificationUri,

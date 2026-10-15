@@ -39,6 +39,7 @@
 - Aplikacja MAUI hostuje wspólny interfejs `DigitalSorter.Web` w WebView; adapter natywny zapewnia `SecureStorage`, konfigurację serwera i obsługę Wstecz. Logowanie Google odbywa się na telefonie.
 - TV inicjuje parowanie i wyświetla QR oraz krótki kod; sekret żądania pozostaje na TV.
 - Użytkownik otwiera stronę brokera na telefonie, autoryzuje konto Google wspólnym przepływem OAuth i potwierdza powiązanie telewizora.
+- Przed zatwierdzeniem broker sprawdza autoryzację Google; ponowna zgoda zachowuje kod parowania.
 - Kod parowania jest jednorazowy, ma krótki termin ważności i limit prób. Odbiór sesji wymaga sekretu pierwotnego żądania TV.
 - TV odpytuje broker o wynik i po zatwierdzeniu otrzymuje niezależną sesję urządzenia. Parowanie jest mechanizmem brokera, a nie Google Device Flow.
 - Poświadczenie sesji TV jest zapisywane przez MAUI `SecureStorage`, wykluczone z kopii zapasowych i usuwane przy wylogowaniu; utrata magazynu wymaga ponownego parowania.
