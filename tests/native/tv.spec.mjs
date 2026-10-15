@@ -156,6 +156,7 @@ test(
         "Chwila nad wodą.webm",
         "Spacer.mov",
       ]) {
+        console.log("Opening native TV video: " + name);
         await next();
         await page.waitForSelector(".media-surface video");
         assert.equal(

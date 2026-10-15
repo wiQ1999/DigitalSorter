@@ -4,8 +4,10 @@ cd "$(dirname "$0")/.."
 fixture_dir=$(realpath "${TEST_NATIVE_FIXTURE:-test-results/native-fixture}")
 test_dir=$(mktemp -d)
 host_pid=
+logcat_pid=
 cleanup() {
   if [[ -n "$host_pid" ]]; then kill "$host_pid" 2>/dev/null || true; wait "$host_pid" 2>/dev/null || true; fi
+  if [[ -n "$logcat_pid" ]]; then kill "$logcat_pid" 2>/dev/null || true; wait "$logcat_pid" 2>/dev/null || true; fi
   timeout 15s adb logcat -d >test-results/native-logcat.txt 2>&1 || true
   timeout 15s adb exec-out screencap -p >test-results/native-device.png 2>/dev/null || true
   rm -rf "$test_dir"
@@ -29,4 +31,6 @@ done
 if [[ "$ready" != true ]]; then cat test-results/native-host.log; exit 1; fi
 adb install -r "$fixture_dir/tv-test.apk"
 adb logcat -c
+adb logcat -v threadtime >test-results/native-live-logcat.txt 2>&1 &
+logcat_pid=$!
 timeout --signal=TERM --kill-after=10s 360s node --test --test-force-exit --test-concurrency=1 tests/native/tv.spec.mjs
