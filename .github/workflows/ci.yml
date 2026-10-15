@@ -7,13 +7,13 @@ permissions:
   contents: read
 jobs:
   web-and-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-dotnet@v6.0.0
         with:
           global-json-file: global.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: '22'
           cache: npm
@@ -21,29 +21,29 @@ jobs:
       - run: npx playwright install --with-deps chrome
       - run: scripts/verify.sh
       - run: dotnet publish src/DigitalSorter.Auth -c Release -o artifacts/web -p:RestoreLockedMode=true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: web-and-backend
           path: artifacts/web
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
           name: test-results
           path: test-results
   android-tv:
-    runs-on: windows-latest
+    runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-dotnet@v6.0.0
         with:
           global-json-file: global.json
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6.1.0
         with:
           distribution: microsoft
           java-version: '21'
       - run: dotnet workload install maui-android --skip-manifest-update
       - run: dotnet build src/DigitalSorter.AndroidTV -c Release -p:RuntimeIdentifier=android-arm64 -p:RestoreLockedMode=true -warnaserror
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: android-tv-test-apk
           path: src/DigitalSorter.AndroidTV/bin/Release/net10.0-android/android-arm64/*Signed.apk
