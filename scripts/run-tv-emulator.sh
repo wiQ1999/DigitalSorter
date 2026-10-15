@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 sdk_dir=${ANDROID_HOME:?Android SDK is required}
+export PATH="$sdk_dir/platform-tools:$sdk_dir/emulator:$PATH"
 manager="$sdk_dir/cmdline-tools/latest/bin/sdkmanager"
 avd_manager="$sdk_dir/cmdline-tools/latest/bin/avdmanager"
 image='system-images;android-36;android-tv;x86_64'
