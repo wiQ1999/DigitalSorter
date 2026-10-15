@@ -6,13 +6,18 @@ manager="$sdk_dir/cmdline-tools/latest/bin/sdkmanager"
 avd_manager="$sdk_dir/cmdline-tools/latest/bin/avdmanager"
 image='system-images;android-36;android-tv;x86_64'
 mkdir -p test-results
+emulator_state_dir=$(mktemp -d "${RUNNER_TEMP:-/tmp}/digitalsorter-tv.XXXXXX")
+export ANDROID_AVD_HOME="$emulator_state_dir/avd"
+mkdir -p "$ANDROID_AVD_HOME"
 set +o pipefail
 yes | "$manager" --licenses >/dev/null
 license_status=${PIPESTATUS[1]}
 set -o pipefail
 test "$license_status" -eq 0
 "$manager" --install "$image" emulator platform-tools
-printf 'no\n' | "$avd_manager" create avd --force --name DigitalSorterTV --package "$image" --device tv_1080p
+printf 'no\n' | "$avd_manager" create avd --force --name DigitalSorterTV --package "$image" --device tv_1080p --path "$ANDROID_AVD_HOME/DigitalSorterTV.avd"
+printf 'avd.ini.encoding=UTF-8\npath=%s\ntarget=android-36\n' "$ANDROID_AVD_HOME/DigitalSorterTV.avd" >"$ANDROID_AVD_HOME/DigitalSorterTV.ini"
+adb start-server
 serial=emulator-5554
 export ANDROID_SERIAL="$serial"
 emulator_pid=
@@ -20,7 +25,8 @@ cleanup() {
   local result=$?
   adb -s "$serial" logcat -d >test-results/native-emulator-logcat.txt 2>&1 || true
   adb -s "$serial" emu kill >/dev/null 2>&1 || true
-  if [[ -n "$emulator_pid" ]]; then kill "$emulator_pid" 2>/dev/null || true; fi
+  if [[ -n "$emulator_pid" ]]; then kill "$emulator_pid" 2>/dev/null || true; wait "$emulator_pid" 2>/dev/null || true; fi
+  rm -rf "$emulator_state_dir"
   exit "$result"
 }
 trap cleanup EXIT
