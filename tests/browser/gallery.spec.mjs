@@ -527,6 +527,32 @@ test(
         .click();
       await tvPage.getByRole("heading", { name: "Twoje źródła" }).waitFor();
       assert.equal(tv.storage.get("session")?.length, 64);
+      const firstCredential = tv.storage.get("session");
+      await tvPage.getByRole("checkbox").first().check();
+      await mode("revoked");
+      await tvPage.getByRole("button", { name: "Otwórz kolekcję" }).click();
+      await tvPage
+        .getByRole("button", { name: "Połącz ponownie", exact: true })
+        .click();
+      await tvPage.locator(".pair-code").waitFor();
+      assert.equal(await tvPage.locator(".toast").count(), 0);
+      const replacement = (
+        await tvPage.locator(".pair-code").innerText()
+      ).trim();
+      await phonePage.goto(origin + "/pair?code=" + replacement);
+      await mode("normal");
+      await phonePage
+        .getByRole("link", { name: "Połącz konto Google" })
+        .click();
+      await phonePage
+        .getByRole("button", { name: "Zatwierdź dostęp testowy" })
+        .click();
+      await phonePage
+        .getByRole("button", { name: "Zatwierdź telewizor" })
+        .click();
+      await tvPage.getByRole("heading", { name: "Twoje źródła" }).waitFor();
+      assert.notEqual(tv.storage.get("session"), firstCredential);
+      await load(tvPage);
       assert.deepEqual(phone.errors, []);
       assert.deepEqual(tv.errors, []);
       results.push({

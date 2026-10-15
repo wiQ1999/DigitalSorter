@@ -174,7 +174,12 @@
     private async Task SignOut(bool disconnect)
     {
         _operation?.Cancel();
-        try { await Broker.SignOutAsync(disconnect); _gallery.Load(MediaCollection.Empty); _selected.Clear(); _confirmDisconnect = false; }
+        try
+        {
+            await Broker.SignOutAsync(disconnect);
+            _gallery.Load(MediaCollection.Empty); _selected.Clear(); _folderStack.Clear(); _folders = [];
+            _parent = null; _error = null; _reauthorize = false; _confirmDisconnect = false;
+        }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException) { _error = ex.Message; }
     }
     public ValueTask DisposeAsync()

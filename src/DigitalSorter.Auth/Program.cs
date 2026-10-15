@@ -197,6 +197,8 @@ app.MapGet("/auth/login", (HttpContext c, string? returnUrl, bool? consent) =>
 }).RequireRateLimiting("login");
 app.MapGet("/api/session", async (HttpContext c, IAntiforgery csrf, BrokerDb db, CancellationToken ct) =>
 {
+    c.Response.Headers.CacheControl = "no-cache, no-store";
+    c.Response.Headers.Pragma = "no-cache";
     var authenticated = c.User.Identity?.IsAuthenticated == true;
     var subject = c.User.FindFirstValue("sub");
     var reauthorize = authenticated && !await db.Accounts.AnyAsync(x => x.Subject == subject && !x.NeedsAuthorization && x.ClientId == google.ClientId, ct);

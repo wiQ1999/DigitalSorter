@@ -102,7 +102,7 @@ public sealed class ControlledEndpoints(ControlledGoogle google, string origin, 
                 context.Response.Redirect(origin + "/auth/callback?code=" + code + "&state=" + Uri.EscapeDataString(query["state"]!)); return;
             }
             if (!path.StartsWith("/test-drive/", StringComparison.Ordinal)) { await continueRequest(); return; }
-            if (context.Request.Headers.Authorization != "Bearer controlled-access-token") { context.Response.StatusCode = 401; return; }
+            if (google.RefreshError == "invalid_grant" || context.Request.Headers.Authorization != "Bearer controlled-access-token") { context.Response.StatusCode = 401; return; }
             if (path == "/test-drive/files")
             {
                 var q = context.Request.Query["q"].ToString();
