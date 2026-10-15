@@ -1,0 +1,69 @@
+@inject BrokerClient Broker
+@inject NavigationManager Navigation
+
+<main class="pair-page">
+    <a class="brand" href="/"><span class="brand-mark"></span>DigitalSorter</a>
+    <section class="pair-card">
+        <span class="eyebrow">POŁĄCZ TELEWIZOR</span>
+        <h1>Wspomnienia na dużym ekranie.</h1>
+        @if (_loading) { <p role="status">Sprawdzam połączenie…</p> }
+        else if (_done)
+        {
+            <div class="success-icon">✓</div><h2>Telewizor połączony</h2><p>Możesz wrócić do oglądania. Zamknij tę stronę na telefonie.</p>
+        }
+        else
+        {
+            <p>Wpisz kod widoczny na telewizorze. Zatwierdź tylko własne urządzenie.</p>
+            <label for="pair-code">Kod parowania</label>
+            <input id="pair-code" @bind="_code" @bind:event="oninput" @bind:after="ClearDetails" maxlength="12" autocomplete="off" inputmode="text" placeholder="ABCD-EFGH" />
+            @if (!Broker.Session.Authenticated)
+            { <a class="button primary" href="@LoginUrl">Połącz konto Google</a> }
+            else
+            {
+                <button class="button" @onclick="Check">Sprawdź urządzenie</button>
+                @if (_details is not null)
+                { <div class="device-confirm"><strong>@_details.DeviceName</strong><p>To urządzenie uzyska dostęp tylko do odczytu Google Drive.</p><button class="button primary" @onclick="Confirm">Zatwierdź telewizor</button></div> }
+            }
+        }
+        @if (_error is not null) { <p class="error-message" role="alert">@_error</p> }
+    </section>
+</main>
+
+@code {
+    private string _code = "";
+    private bool _loading = true, _done;
+    private string? _error;
+    private PairingDetails? _details;
+    private string LoginUrl => "/auth/login?returnUrl=" + Uri.EscapeDataString("/pair?code=" + Uri.EscapeDataString(_code));
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _code = System.Web.HttpUtility.ParseQueryString(new Uri(Navigation.Uri).Query)["code"] ?? "";
+        try { await Broker.InitializeAsync(); if (Broker.Session.Authenticated && _code.Length > 0) await Check(); }
+        catch (Exception ex) when (ex is HttpRequestException or JSException) { _error = "Nie można przygotować połączenia z brokerem. Sprawdź Internet i odśwież stronę."; }
+        _loading = false; StateHasChanged();
+    }
+    private async Task Check()
+    {
+        var code = _code;
+        try
+        {
+            var details = await Broker.DetailsAsync(code);
+            if (code != _code) return;
+            _details = details;
+            _error = _details is null ? "Kod jest nieprawidłowy, wygasł lub został już użyty." : null;
+        }
+        catch (HttpRequestException) { _error = "Nie można połączyć się z brokerem. Spróbuj ponownie."; }
+    }
+    private void ClearDetails() => _details = null;
+    private async Task Confirm()
+    {
+        if (_details is null) return;
+        try
+        {
+            _done = await Broker.ConfirmAsync(_code);
+            if (!_done) _error = "Nie można zatwierdzić tego kodu. Rozpocznij parowanie ponownie.";
+        }
+        catch (HttpRequestException) { _error = "Nie można połączyć się z brokerem. Spróbuj ponownie."; }
+    }
+}

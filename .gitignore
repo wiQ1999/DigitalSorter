@@ -361,3 +361,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local application state and reproducible frontend dependencies
+**/data/
+src/DigitalSorter.Web/wwwroot/vendor/
+src/DigitalSorter.Web/wwwroot/media-worker.js
+test-results/
+playwright-report/
+.env

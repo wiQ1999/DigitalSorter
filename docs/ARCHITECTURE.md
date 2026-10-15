@@ -7,6 +7,7 @@
 - `DigitalSorter.Auth` — wspólny backend OAuth i sesji dla aplikacji webowej oraz Android TV.
 - `DigitalSorter.AndroidTV` — warstwa prezentacji Android TV oparta na .NET MAUI.
 - `DigitalSorter.Web` — warstwa prezentacji dla przeglądarki oparta na standalone Blazor WebAssembly.
+- `DigitalSorter.Contracts` — kontrakty HTTP brokera, niezależne od Core.
 
 ## Core
 
@@ -35,6 +36,7 @@
 
 ## Android TV — parowanie przez telefon
 
+- Aplikacja MAUI hostuje wspólny interfejs `DigitalSorter.Web` w WebView; adapter natywny zapewnia `SecureStorage`, konfigurację serwera i obsługę Wstecz. Logowanie Google odbywa się na telefonie.
 - TV inicjuje parowanie i wyświetla QR oraz krótki kod; sekret żądania pozostaje na TV.
 - Użytkownik otwiera stronę brokera na telefonie, autoryzuje konto Google wspólnym przepływem OAuth i potwierdza powiązanie telewizora.
 - Kod parowania jest jednorazowy, ma krótki termin ważności i limit prób. Odbiór sesji wymaga sekretu pierwotnego żądania TV.
@@ -48,6 +50,9 @@
 - Stylowanie wykorzystuje CSS, w tym CSS isolation dla stylów przypisanych do komponentów.
 - Logika interfejsu i stan aplikacji są realizowane przede wszystkim w C#; JavaScript jest ograniczony do niewielkich modułów wywoływanych przez JS interop, gdy wymagają tego API przeglądarki lub biblioteki zewnętrzne.
 - TypeScript ani dodatkowy framework JavaScript nie są częścią podstawowego stosu technologicznego.
+- Interfejs Web i TV ma stałą ciemną paletę z akcentami niebieskim, zielonym i żółtym. TV obsługuje nawigację pilotem.
+- Tło odtwarzacza próbkuje kolory z brzegów bieżącej klatki zdjęcia lub filmu; pełny ekran ma czarne tło.
+- Adapter przeglądarkowy w `DigitalSorter.Data.GoogleDrive` strumieniuje żądania Range z nagłówkiem OAuth przez service worker. Nie zapisuje plików ani tokenów w cache; HEIC/HEIF dekoduje klient.
 - Sesja webowa używa cookie `HttpOnly`, `Secure`, z określoną ważnością, polityką `SameSite` i ochroną CSRF.
 
 ## Hosting i wdrożenie

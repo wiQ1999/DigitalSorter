@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.13" />
+    <ProjectReference Include="../DigitalSorter.Core/DigitalSorter.Core.csproj" />
+    <ProjectReference Include="../DigitalSorter.Contracts/DigitalSorter.Contracts.csproj" />
+    <ProjectReference Include="../DigitalSorter.Data.GoogleDrive/DigitalSorter.Data.GoogleDrive.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Remove="wwwroot/media-worker.js" />
+    <Content Include="wwwroot/media-worker.js" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="PrepareDriveBrowserAdapter" BeforeTargets="PrepareForBuild">
+    <Copy SourceFiles="../DigitalSorter.Data.GoogleDrive/Browser/media-worker.js" DestinationFiles="wwwroot/media-worker.js" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

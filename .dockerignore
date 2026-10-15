@@ -1,0 +1,11 @@
+.git
+**/bin
+**/obj
+**/data
+node_modules
+src/DigitalSorter.Web/wwwroot/vendor
+src/DigitalSorter.Web/wwwroot/media-worker.js
+test-results
+playwright-report
+.env
+secrets
