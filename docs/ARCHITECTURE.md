@@ -30,7 +30,7 @@
 - Web i TV współdzielą magazyn poświadczeń Google i usługę wydawania tokenów `access_token`; osobne są sesje webowe, sesje urządzeń i endpointy parowania TV.
 - Backend trwale przechowuje zaszyfrowany `refresh_token`, identyfikator konta, klienta OAuth i przyznane zakresy; klucze szyfrowania oraz `client_secret` pozostają w magazynie sekretów.
 - `refresh_token` i Google `client_secret` nie trafiają do przeglądarki ani TV. Klient pobiera `access_token` przez HTTPS, przechowuje go w pamięci i wywołuje Drive bezpośrednio.
-- Ważne sesje i poświadczenia są zachowywane po restarcie brokera. Odświeżanie nie wymaga ponownej zgody; brak nowego `refresh_token` w odpowiedzi nie usuwa zapisanego tokenu.
+- Odświeżanie dostępu nie wymaga ponownej zgody, dopóki autoryzacja Google pozostaje ważna; brak nowego `refresh_token` w odpowiedzi nie usuwa zapisanego tokenu.
 - Utrata autoryzacji Google wymaga ponownego połączenia konta. Wylogowanie klienta unieważnia tylko jego sesję; odłączenie Google cofa zgodę i usuwa poświadczenia oraz sesje powiązanych klientów.
 
 ## Android TV — parowanie przez telefon
@@ -48,17 +48,17 @@
 - Stylowanie wykorzystuje CSS, w tym CSS isolation dla stylów przypisanych do komponentów.
 - Logika interfejsu i stan aplikacji są realizowane przede wszystkim w C#; JavaScript jest ograniczony do niewielkich modułów wywoływanych przez JS interop, gdy wymagają tego API przeglądarki lub biblioteki zewnętrzne.
 - TypeScript ani dodatkowy framework JavaScript nie są częścią podstawowego stosu technologicznego.
-- Opublikowane pliki statyczne są hostowane przez GitHub Pages projektu.
-- Sesja webowa używa cookie `HttpOnly`, `Secure`, z określoną ważnością, polityką `SameSite` i ochroną CSRF. Konfiguracja domen musi umożliwiać sesję bez zależności od cookies stron trzecich.
-- Budowanie i publikowanie frontendu realizuje GitHub Actions z użyciem `dotnet publish`.
+- Sesja webowa używa cookie `HttpOnly`, `Secure`, z określoną ważnością, polityką `SameSite` i ochroną CSRF.
 
-### GitHub Pages — wymagania techniczne
+## Hosting i wdrożenie
 
-- Aplikacja jest publikowana jako Project Pages pod ścieżką `/DigitalSorter/`, dlatego `base href` musi wskazywać `/DigitalSorter/`; wartość jest ustawiana w procesie publikacji.
-- GitHub Pages nie obsługuje reguły SPA fallback do `index.html`; bezpośrednie wejście lub odświeżenie trasy Blazor wymaga `404.html`, który przekierowuje do aplikacji i odtwarza pierwotną trasę.
-- Publikacja zawiera plik `.nojekyll`, aby katalog Blazor `_framework` nie był pomijany przez przetwarzanie Jekyll.
-- Pliki JavaScript publikacji muszą być chronione przed zmianą zakończeń linii przez Git, np. przez odpowiednią regułę w `.gitattributes`, aby nie naruszyć kontroli integralności zasobów Blazor.
-- Backend OAuth musi zezwalać na żądania wyłącznie z dozwolonych originów aplikacji webowej i obsługiwać HTTPS.
+- Hosting uruchamia backend ASP.NET Core na .NET 10 i jednocześnie udostępnia pliki `DigitalSorter.Web`; dostawca pozostaje dowolny.
+- Frontend i backend działają pod jednym originem HTTPS (schemat, host i port); komunikacja web–broker używa adresów względnych.
+- Ścieżki: `/` — frontend z `base href="/"`, `/auth/` — OAuth i sesja webowa, `/api/` — API brokera, `/pair` — zatwierdzanie TV na telefonie.
+- Routing SPA zwraca `index.html` dla tras frontendu; ścieżki API i OAuth nie podlegają temu fallbackowi.
+- Opublikowane zasoby są udostępniane bez zmiany zawartości, z właściwymi typami MIME i obsługą kompresji.
+- Magazyny poświadczeń, sesji i sekretów zachowują dane po restarcie oraz ponownym wdrożeniu.
+- GitHub Actions buduje i wdraża frontend oraz backend razem, z użyciem `dotnet publish`.
 
 ## Standard testów
 

@@ -1,6 +1,6 @@
 # Wymagania produktowe — DigitalSorter
 
-**Wersja:** 0.7
+**Wersja:** 0.8
 
 ## Cel produktu
 
@@ -9,9 +9,10 @@
 
 ## Kanały dostępu
 
-- Aplikacja przeglądarkowa — standalone Blazor WebAssembly na GitHub Pages projektu; Razor Components, HTML5, CSS i JavaScript ograniczony do niezbędnego interopu.
+- Aplikacja przeglądarkowa — standalone Blazor WebAssembly; Razor Components, HTML5, CSS i JavaScript ograniczony do niezbędnego interopu.
 - Aplikacja Android TV — warstwa prezentacji oparta na .NET MAUI.
 - Oba kanały korzystają ze wspólnego backendu autoryzacji Google i zarządzania sesjami.
+- Wymagania hostingu określa [architektura](ARCHITECTURE.md#hosting-i-wdrożenie).
 
 ## Połączenie konta Google
 
