@@ -1,6 +1,6 @@
 # Wymagania produktowe — DigitalSorter
 
-**Wersja:** 0.6
+**Wersja:** 0.7
 
 ## Cel produktu
 
@@ -9,8 +9,16 @@
 
 ## Kanały dostępu
 
-- Aplikacja przeglądarkowa — standalone Blazor WebAssembly hostowany na GitHub Pages projektu; interfejs wykorzystuje Razor Components, HTML5 i CSS, a JavaScript jest ograniczony do niezbędnego interopu z funkcjami przeglądarki i bibliotekami zewnętrznymi. Osobny backend służy wyłącznie do uwierzytelniania i zarządzania tokenami Google.
+- Aplikacja przeglądarkowa — standalone Blazor WebAssembly na GitHub Pages projektu; Razor Components, HTML5, CSS i JavaScript ograniczony do niezbędnego interopu.
 - Aplikacja Android TV — warstwa prezentacji oparta na .NET MAUI.
+- Oba kanały korzystają ze wspólnego backendu autoryzacji Google i zarządzania sesjami.
+
+## Połączenie konta Google
+
+- Web: autoryzacja konta w przeglądarce przez broker OAuth.
+- Android TV: kod lub QR na telewizorze, autoryzacja Google i zatwierdzenie telewizora na telefonie.
+- Po ponownym uruchomieniu dostęp jest przywracany bez ponownej zgody, dopóki sesja klienta i autoryzacja Google pozostają ważne.
+- Użytkownik może wylogować pojedyncze urządzenie lub przeglądarkę albo odłączyć konto Google we wszystkich powiązanych klientach.
 
 ## Obsługiwane formaty
 
