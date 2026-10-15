@@ -6,7 +6,8 @@ test_dir=$(mktemp -d)
 host_pid=
 cleanup() {
   if [[ -n "$host_pid" ]]; then kill "$host_pid" 2>/dev/null || true; wait "$host_pid" 2>/dev/null || true; fi
-  adb logcat -d >test-results/native-logcat.txt 2>&1 || true
+  timeout 15s adb logcat -d >test-results/native-logcat.txt 2>&1 || true
+  timeout 15s adb exec-out screencap -p >test-results/native-device.png 2>/dev/null || true
   rm -rf "$test_dir"
 }
 trap cleanup EXIT
@@ -28,4 +29,4 @@ done
 if [[ "$ready" != true ]]; then cat test-results/native-host.log; exit 1; fi
 adb install -r "$fixture_dir/tv-test.apk"
 adb logcat -c
-node --test --test-concurrency=1 tests/native/tv.spec.mjs
+timeout --signal=TERM --kill-after=10s 360s node --test --test-force-exit --test-concurrency=1 tests/native/tv.spec.mjs

@@ -36,16 +36,17 @@ trap cleanup EXIT
   -memory 3072 -cores 2 >test-results/native-emulator.log 2>&1 &
 emulator_pid=$!
 stable=0
-for attempt in {1..180}; do
+boot_deadline=$((SECONDS + 360))
+while [[ "$SECONDS" -lt "$boot_deadline" ]]; do
   if ! kill -0 "$emulator_pid" 2>/dev/null; then cat test-results/native-emulator.log; exit 1; fi
-  boot=$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
-  package=$(adb -s "$serial" shell pm path android 2>/dev/null || true)
+  boot=$(timeout 8s adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
+  package=$(timeout 8s adb -s "$serial" shell pm path android 2>/dev/null || true)
   if [[ "$boot" == 1 && "$package" == package:* ]]; then
     stable=$((stable + 1))
     if [[ "$stable" -ge 4 ]]; then break; fi
   else
     stable=0
-    adb reconnect offline >/dev/null 2>&1 || true
+    timeout 8s adb reconnect offline >/dev/null 2>&1 || true
   fi
   sleep 2
 done
