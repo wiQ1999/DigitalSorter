@@ -1,6 +1,6 @@
 # Android TV — instalacja z laptopa i publikacja w Google Play
 
-Backend musi już działać według [instrukcji wdrożenia](DEPLOYMENT.md). Telewizor i telefon muszą mieć dostęp do tego samego adresu HTTPS z prawidłowym certyfikatem. Lokalne demo `http://localhost` działa tylko na komputerze i nie służy do parowania fizycznego TV.
+Backend może działać na hostingu albo lokalnie na laptopie. TV i telefon muszą mieć dostęp do tego samego adresu HTTPS z zaufanym certyfikatem. [Certyfikat i lokalny backend dla TV](DEPLOYMENT.md#2-certyfikat-do-lokalnego-backendu-dla-tv-i-telefonu) — domena, DNS-01, LAN i konfiguracja WSL.
 
 Poniższe polecenia laptopa używają PowerShell na Windows. Android SDK Platform-Tools są dostępne także na Linux/macOS; polecenia `adb` pozostają takie same. Przykłady zakładają jedno urządzenie ADB; przy kilku dodawaj `-s NUMER_SERYJNY` po `adb`.
 
@@ -66,13 +66,13 @@ Jeżeli pojawia się `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, podpis zainstalowanej
 
 ## 4. Pierwsze uruchomienie i parowanie
 
-1. Wpisz na TV origin serwera, np. `https://galeria.example.com`, bez dodatkowej ścieżki.
+1. Uruchom backend. Wpisz na TV jego origin, np. `https://galeria.example.com` albo lokalny `https://tv-test.twojadomena.pl:7043`, bez dodatkowej ścieżki. `localhost` na TV oznacza sam telewizor.
 2. Wybierz „Otwórz DigitalSorter”, następnie „Połącz przez telefon”.
 3. Zeskanuj QR telefonem lub otwórz wskazany adres i wpisz kod.
-4. Zaloguj się do Google w przeglądarce telefonu i przyznaj odczyt Drive.
+4. Zaloguj się do Google w przeglądarce telefonu i przyznaj odczyt Drive. W lokalnym demo zamiast tego wybierz „Zatwierdź dostęp testowy”; konto Google nie jest potrzebne.
 5. Sprawdź kod oraz nazwę urządzenia i zatwierdź powiązanie. Jeżeli kod wygasł, rozpocznij parowanie ponownie na TV.
 6. Na TV wybierz foldery i otwórz kolekcję.
-7. Sprawdź strzałki, OK, Play/Pause oraz Wstecz z pełnego ekranu. Zamknij i uruchom aplikację ponownie; sesja powinna pozostać aktywna.
+7. Sprawdź strzałki, OK, Play/Pause oraz Wstecz z pełnego ekranu. Zamknij i uruchom aplikację ponownie; sesja powinna pozostać aktywna. W demo pozostaw backend uruchomiony — jego zatrzymanie usuwa tymczasowe dane parowania.
 
 Logowanie Google nie odbywa się w WebView telewizora. Backend zachowuje zaszyfrowany Google `refresh_token`, a TV własną sesję w `SecureStorage`. Wstecz poza odtwarzaczem otwiera menu umożliwiające zmianę serwera. Wylogowanie TV usuwa jego sesję; odłączenie Google unieważnia dostęp wszystkich powiązanych klientów.
 

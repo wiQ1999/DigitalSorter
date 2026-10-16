@@ -20,8 +20,6 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chrome
       - run: scripts/verify.sh
-      - name: Verify the local HTTP development setup
-        run: TEST_HTTP=1 TEST_PORT=7080 scripts/test-browser.sh
       - run: dotnet publish src/DigitalSorter.Auth -c Release -o artifacts/web -p:RestoreLockedMode=true
       - uses: actions/upload-artifact@v7.0.2
         with:

@@ -19,7 +19,7 @@ dotnet publish src/DigitalSorter.Auth --configuration Release --no-restore -o "$
 export TEST_WEB_ROOT="$test_dir/published/wwwroot"
 export TEST_ORIGIN=https://localhost:7443 TEST_PORT=7443
 export TEST_CERTIFICATE_PEM="$fixture_dir/test-ca.pem"
-TEST_CERTIFICATE="$fixture_dir/test.pfx" TEST_FIXTURES="$PWD/tests/fixtures" \
+TEST_CERTIFICATE="$fixture_dir/test.pfx" TEST_CERTIFICATE_PASSWORD= TEST_BIND_ADDRESS=0.0.0.0 TEST_FIXTURES="$PWD/tests/fixtures" TEST_DATA_DIRECTORY="$test_dir/data" \
   dotnet tests/DigitalSorter.BrowserHost/bin/Release/net10.0/DigitalSorter.BrowserHost.dll >test-results/native-host.log 2>&1 &
 host_pid=$!
 ready=false

@@ -6,12 +6,12 @@ Galeria zdjęć i filmów z Google Drive, sortowana według daty wykonania. Web 
 
 Instrukcje krok po kroku:
 
-- [Lokalne testy przez HTTP i wdrożenie produkcyjne](docs/DEPLOYMENT.md).
+- [Lokalne testy i wdrożenie produkcyjne przez HTTPS, certyfikaty](docs/DEPLOYMENT.md).
 - [Instalacja Android TV przez USB i publikacja w Google Play](docs/ANDROID_TV.md).
 
-Wymagane: SDK z `global.json`, Node.js 22+; HTTPS poza lokalnym Development. Dla TV: workload `maui-android`, JDK 21, Android SDK 36.
+Wymagane: SDK z `global.json`, Node.js 22+, HTTPS. Dla TV: workload `maui-android`, JDK 21, Android SDK 36.
 
-Lokalne demo bez konta Google i certyfikatu: `npm ci --ignore-scripts`, następnie `bash scripts/run-local-demo.sh`; adres `http://localhost:7080`.
+Lokalne demo bez konta Google: przygotuj certyfikat według [instrukcji](docs/DEPLOYMENT.md), wykonaj `npm ci --ignore-scripts` i `bash scripts/run-local-demo.sh`. Ten sam backend może obsługiwać TV i telefon w LAN przez HTTPS.
 
 Uruchomienie backendu z rzeczywistym Google przez HTTPS:
 

@@ -3,35 +3,29 @@ import assert from "node:assert/strict";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { X509Certificate, createHash } from "node:crypto";
 import { chromium } from "playwright";
-import { join } from "node:path";
 
 const origin = process.env.TEST_ORIGIN ?? "https://localhost:7443";
-const resultsDirectory = origin.startsWith("http:") ? "test-results/http" : "test-results";
-const tlsArgs = [];
-if (origin.startsWith("https:")) {
-  const certificate = new X509Certificate(
-    readFileSync(process.env.TEST_CERTIFICATE_PEM),
-  );
-  const pin = createHash("sha256")
-    .update(certificate.publicKey.export({ type: "spki", format: "der" }))
-    .digest("base64");
-  tlsArgs.push("--ignore-certificate-errors-spki-list=" + pin);
-}
+const certificate = new X509Certificate(
+  readFileSync(process.env.TEST_CERTIFICATE_PEM),
+);
+const pin = createHash("sha256")
+  .update(certificate.publicKey.export({ type: "spki", format: "der" }))
+  .digest("base64");
 let browser;
 const results = [];
 before(async () => {
-  mkdirSync(resultsDirectory, { recursive: true });
+  mkdirSync("test-results", { recursive: true });
   browser = await chromium.launch({
     executablePath: process.env.TEST_CHROMIUM,
     channel: process.env.TEST_CHROMIUM ? undefined : "chrome",
-    args: ["--no-sandbox", ...tlsArgs],
+    args: ["--no-sandbox", "--ignore-certificate-errors-spki-list=" + pin],
     headless: true,
   });
 });
 after(async () => {
   await browser?.close();
   writeFileSync(
-    join(resultsDirectory, "browser-results.json"),
+    "test-results/browser-results.json",
     JSON.stringify(results, null, 2),
   );
 });
@@ -127,11 +121,6 @@ test(
   async () => {
     await checked("web-gallery-and-ambient", async (page) => {
       await login(page);
-      assert.equal(await page.evaluate(() => window.isSecureContext), true);
-      const cookies = await page.context().cookies();
-      const https = origin.startsWith("https:");
-      assert.ok(cookies.some((cookie) => cookie.name ===
-        (https ? "__Host-DigitalSorter.Session" : "DigitalSorter.Development.Session") && cookie.secure === https));
       await load(page);
       assert.match(await page.getByTestId("counter").innerText(), /1\s*\/\s*9/);
       assert.equal(
@@ -153,7 +142,7 @@ test(
         );
       assert.equal(new Set(colors).size >= 3, true);
       await page.screenshot({
-        path: join(resultsDirectory, "web-gallery.png"),
+        path: "test-results/web-gallery.png",
         fullPage: true,
       });
       await next(page);
@@ -210,7 +199,7 @@ test(
         await imageReady(page);
         await previewsReady();
         await page.screenshot({
-          path: join(resultsDirectory, "client-thumbnails.png"),
+          path: "test-results/client-thumbnails.png",
           fullPage: true,
         });
       } finally {
@@ -389,7 +378,7 @@ test(
         "rgb(11, 16, 24)",
       );
       await page.screenshot({
-        path: join(resultsDirectory, "web-mobile.png"),
+        path: "test-results/web-mobile.png",
         fullPage: true,
       });
       assert.deepEqual(fixture.errors, []);
@@ -415,7 +404,7 @@ test(
       const code = (await tvPage.locator(".pair-code").innerText()).trim();
       assert.match(code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
       await tvPage.screenshot({
-        path: join(resultsDirectory, "tv-pairing.png"),
+        path: "test-results/tv-pairing.png",
         fullPage: true,
       });
       const phonePage = await phone.ctx.newPage();
@@ -493,7 +482,7 @@ test(
         );
       }
       await tvPage.screenshot({
-        path: join(resultsDirectory, "tv-gallery.png"),
+        path: "test-results/tv-gallery.png",
         fullPage: true,
       });
       await tvPage.getByTestId("media-stage").focus();

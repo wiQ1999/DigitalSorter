@@ -15,58 +15,17 @@ public sealed class BrokerTests
     [Theory]
     [InlineData("Production", "http://localhost:7080")]
     [InlineData("Testing", "http://localhost:7080")]
+    [InlineData("Development", "http://localhost:7080")]
     [InlineData("Development", "http://example.com")]
     [InlineData("Development", "http://192.168.1.10:7080")]
     [InlineData("Development", "https://localhost/path")]
     [InlineData("Development", "http://user:password@localhost:7080")]
     [InlineData("Development", "ftp://localhost")]
-    public void InvalidOrNonlocalHttpOriginIsRejected(string environment, string origin)
+    public void HttpAndInvalidOriginsAreRejected(string environment, string origin)
     {
         using var factory = new BrokerFactory { EnvironmentName = environment, PublicOrigin = origin };
         var error = Assert.Throws<InvalidOperationException>(() => factory.Client());
         Assert.Contains("Broker:PublicOrigin", error.ToString());
-    }
-
-    [Fact]
-    public async Task DevelopmentLoopbackHttpSupportsOAuthCsrfAndLogout()
-    {
-        using var factory = new BrokerFactory { EnvironmentName = "Development", PublicOrigin = "http://localhost:7080" };
-        using var client = factory.Client();
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
-        var response = await factory.Login(client);
-        Assert.Equal("/", response.Headers.Location!.OriginalString);
-        var cookie = response.Headers.GetValues("Set-Cookie").Single(x => x.StartsWith("DigitalSorter.Development.Session="));
-        Assert.DoesNotContain("; secure", cookie);
-        Assert.Contains("httponly", cookie);
-        Assert.Equal(HttpStatusCode.BadRequest, (await Post(client, "/api/token")).StatusCode);
-        Assert.True((await Session(client)).Authenticated);
-        Assert.Equal(HttpStatusCode.OK, (await Post(client, "/api/token")).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await Post(client, "/api/logout")).StatusCode);
-        Assert.False((await Session(client)).Authenticated);
-    }
-
-    [Fact]
-    public async Task DevelopmentHttpRejectsRemoteClients()
-    {
-        using var factory = new BrokerFactory { EnvironmentName = "Development", PublicOrigin = "http://localhost:7080" };
-        using var client = factory.Client();
-        var response = await factory.Server.SendAsync(c =>
-        {
-            c.Request.Scheme = "http";
-            c.Request.Host = new("localhost:7080");
-            c.Request.Path = "/health";
-            c.Connection.RemoteIpAddress = IPAddress.Parse("192.168.1.2");
-        });
-        Assert.Equal(400, response.Response.StatusCode);
-    }
-
-    [Fact]
-    public async Task DevelopmentHttpRejectsRequestsForAnotherOrigin()
-    {
-        using var factory = new BrokerFactory { EnvironmentName = "Development", PublicOrigin = "http://localhost:7080" };
-        using var client = factory.Client();
-        client.DefaultRequestHeaders.Host = "localhost:7081";
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/health")).StatusCode);
     }
 
     private static async Task<SessionInfo> Session(HttpClient client)

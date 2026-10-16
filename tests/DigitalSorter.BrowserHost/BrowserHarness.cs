@@ -13,19 +13,16 @@ public static class BrowserHarness
     public static async Task Main()
     {
         var port = int.Parse(Environment.GetEnvironmentVariable("TEST_PORT") ?? "7443");
-        var localHttp = Environment.GetEnvironmentVariable("TEST_HTTP") == "1";
-        var origin = (localHttp ? "http" : "https") + "://localhost:" + port;
+        var origin = Environment.GetEnvironmentVariable("TEST_ORIGIN") ?? "https://localhost:" + port;
+        if (!Uri.TryCreate(origin, UriKind.Absolute, out var address) || address.Scheme != "https" || address.Port != port ||
+            address.AbsolutePath != "/" || !string.IsNullOrEmpty(address.Query) || !string.IsNullOrEmpty(address.Fragment) || !string.IsNullOrEmpty(address.UserInfo))
+            throw new InvalidOperationException("Set TEST_ORIGIN to an HTTPS origin matching TEST_PORT.");
+        origin = address.GetLeftPart(UriPartial.Authority);
+        var certificate = Environment.GetEnvironmentVariable("TEST_CERTIFICATE") ?? throw new InvalidOperationException("Set TEST_CERTIFICATE to the test PFX.");
+        var password = Environment.GetEnvironmentVariable("TEST_CERTIFICATE_PASSWORD") ?? "";
+        var bindAddress = IPAddress.Parse(Environment.GetEnvironmentVariable("TEST_BIND_ADDRESS") ?? "0.0.0.0");
         using var factory = new BrowserFactory(origin, Environment.GetEnvironmentVariable("TEST_FIXTURES") ?? "tests/fixtures");
-        if (localHttp)
-        {
-            factory.EnvironmentName = "Development";
-            factory.UseKestrel(options => options.ListenLocalhost(port));
-        }
-        else
-        {
-            var certificate = Environment.GetEnvironmentVariable("TEST_CERTIFICATE") ?? throw new InvalidOperationException("Set TEST_CERTIFICATE to the temporary test PFX.");
-            factory.UseKestrel(options => options.Listen(IPAddress.Any, port, listen => listen.UseHttps(certificate)));
-        }
+        factory.UseKestrel(options => options.Listen(bindAddress, port, listen => listen.UseHttps(certificate, password)));
         factory.StartServer();
         Console.WriteLine("Controlled OAuth/Drive test host ready at " + origin);
         var stop = new TaskCompletionSource();
@@ -47,7 +44,7 @@ public sealed class BrowserFactory : BrokerFactory
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
-        builder.UseSetting("AllowedHosts", "localhost;127.0.0.1;10.0.2.2");
+        builder.UseSetting("AllowedHosts", "localhost;127.0.0.1;10.0.2.2;" + new Uri(PublicOrigin).Host);
         if (Environment.GetEnvironmentVariable("TEST_WEB_ROOT") is { Length: > 0 } publishedRoot)
         {
             builder.UseWebRoot(Path.GetFullPath(publishedRoot));
