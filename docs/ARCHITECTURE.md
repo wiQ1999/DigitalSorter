@@ -61,6 +61,7 @@
 
 - Hosting uruchamia backend ASP.NET Core na .NET 10 i jednocześnie udostępnia pliki `DigitalSorter.Web`; dostawca pozostaje dowolny.
 - Frontend i backend działają pod jednym originem HTTPS (schemat, host i port); komunikacja web–broker używa adresów względnych.
+- Wyjątek lokalny: `Development` dopuszcza HTTP tylko na loopback, z osobnymi cookies bez prefiksu `__Host-` i z kontrolą originu oraz adresu klienta. TV i produkcja wymagają HTTPS. Procedury: [wdrożenie](DEPLOYMENT.md), [Android TV i Google Play](ANDROID_TV.md).
 - Ścieżki: `/` — frontend z `base href="/"`, `/auth/` — OAuth i sesja webowa, `/api/` — API brokera, `/pair` — zatwierdzanie TV na telefonie.
 - Routing SPA zwraca `index.html` dla tras frontendu; ścieżki API i OAuth nie podlegają temu fallbackowi.
 - Opublikowane zasoby są udostępniane bez zmiany zawartości, z właściwymi typami MIME i obsługą kompresji.
