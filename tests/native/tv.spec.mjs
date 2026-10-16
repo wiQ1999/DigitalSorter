@@ -131,12 +131,31 @@ test(
       console.log(
         "Native SecureStorage restored the session after process restart",
       );
+      await phone.evaluate(async () => {
+        const response = await fetch("/test-drive/control", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ unavailableThumbnails: true }),
+        });
+        if (!response.ok)
+          throw new Error("Controlled Drive configuration failed");
+      });
       await page.getByRole("checkbox").first().check();
       await page.getByRole("button", { name: "Otwórz kolekcję" }).click();
       await page.waitForFunction(
         () => document.querySelector(".media-surface img")?.naturalWidth > 0,
       );
       assert.match(await page.getByTestId("counter").innerText(), /1\s*\/\s*9/);
+      await page.waitForFunction(() => {
+        const images = [...document.querySelectorAll(".thumbnail img")];
+        return (
+          images.length === 5 &&
+          images.every((image) => image.complete && image.naturalWidth > 0)
+        );
+      });
+      console.log(
+        "Native photo and video previews work without Drive thumbnail links",
+      );
       await page.getByTestId("media-stage").focus();
       await device.shell("input keyevent KEYCODE_DPAD_RIGHT");
       await page.waitForFunction(() =>

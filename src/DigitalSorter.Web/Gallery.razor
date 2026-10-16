@@ -64,7 +64,7 @@
                     <nav class="gallery-navigation" aria-label="Nawigacja materiałów"><button class="button secondary" disabled="@(!_gallery.CanPrevious)" @onclick="Previous">← Poprzedni</button><span class="counter" data-testid="counter"><strong>@_gallery.Position</strong><span>/</span>@_gallery.Items.Count</span><button class="button secondary" disabled="@(!_gallery.CanNext)" @onclick="Next">Następny →</button></nav>
                     <section class="upcoming"><div class="section-heading"><span class="eyebrow">ZA CHWILĘ</span><span class="muted small">Kolejne materiały</span></div><div class="thumbnail-strip">
                     @foreach (var item in _gallery.Upcoming)
-                    { var targetIndex = _gallery.Items.ToList().IndexOf(item); <button class="thumbnail" @onclick="() => _gallery.Select(targetIndex)" title="@item.Name"><img loading="lazy" src="@("/drive-content/" + Uri.EscapeDataString(item.Id) + "?thumbnail=1")" alt="" /><span class="thumbnail-kind">@(item.Kind == MediaKind.Video ? "▶" : "▧")</span><span class="thumbnail-caption">@item.Name</span></button> }
+                    { var targetIndex = _gallery.Items.ToList().IndexOf(item); <button @key="(item.Id, _loadGeneration)" class="thumbnail" @onclick="() => _gallery.Select(targetIndex)" title="@item.Name"><MediaThumbnail Asset="item" /><span class="thumbnail-kind">@(item.Kind == MediaKind.Video ? "▶" : "▧")</span><span class="thumbnail-caption">@item.Name</span></button> }
                     </div></section>
                 }
                 else

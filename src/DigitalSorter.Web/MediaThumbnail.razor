@@ -1,0 +1,32 @@
+@implements IAsyncDisposable
+@inject BrokerClient Broker
+
+<img @ref="_image" loading="lazy" src="@("/drive-content/" + Uri.EscapeDataString(Asset.Id) + "?thumbnail=1")" alt="" @onerror="Fallback" />
+
+@code {
+    [Parameter, EditorRequired] public MediaAsset Asset { get; set; } = default!;
+    private ElementReference _image;
+    private IJSObjectReference? _fallback;
+    private bool _started, _disposed;
+
+    private async Task Fallback()
+    {
+        if (_started || _disposed) return;
+        _started = true;
+        try
+        {
+            var fallback = await Broker.Module.InvokeAsync<IJSObjectReference>("fallbackThumbnail", _image, Asset.Id, Asset.Name, Asset.MimeType, Asset.Kind == MediaKind.Video);
+            if (_disposed) { await fallback.InvokeVoidAsync("dispose"); await fallback.DisposeAsync(); }
+            else _fallback = fallback;
+        }
+        catch (JSException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_fallback is null) return;
+        try { await _fallback.InvokeVoidAsync("dispose"); await _fallback.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+    }
+}

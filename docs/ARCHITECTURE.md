@@ -54,6 +54,7 @@
 - Interfejs Web i TV ma stałą ciemną paletę z akcentami niebieskim, zielonym i żółtym. TV obsługuje nawigację pilotem.
 - Tło odtwarzacza próbkuje kolory z brzegów bieżącej klatki zdjęcia lub filmu; pełny ekran ma czarne tło.
 - Adapter przeglądarkowy w `DigitalSorter.Data.GoogleDrive` strumieniuje żądania Range z nagłówkiem OAuth przez service worker. Nie zapisuje plików ani tokenów w cache; HEIC/HEIF dekoduje klient.
+- Gdy miniatura Drive jest niedostępna lub blokowana przez CORS, klient tworzy podgląd z oryginalnego zdjęcia albo klatki filmu; bez pośrednictwa backendu.
 - Sesja webowa używa cookie `HttpOnly`, `Secure`, z określoną ważnością, polityką `SameSite` i ochroną CSRF.
 
 ## Hosting i wdrożenie

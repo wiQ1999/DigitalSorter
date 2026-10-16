@@ -177,6 +177,99 @@ function onKey(event) {
   }
 }
 
+function isHeif(name, mime) {
+  return /\.(heic|heif)$/i.test(name) || /^image\/(heic|heif)$/i.test(mime);
+}
+
+export function fallbackThumbnail(image, id, name, mime, video) {
+  const controller = new AbortController();
+  const source = "/drive-content/" + encodeURIComponent(id);
+  let disposed = false,
+    objectUrl,
+    preview;
+  function releaseVideo() {
+    if (!preview) return;
+    preview.pause();
+    preview.removeAttribute("src");
+    preview.load();
+    preview = undefined;
+  }
+  function show(blob) {
+    if (disposed || !blob) return;
+    objectUrl = URL.createObjectURL(blob);
+    image.src = objectUrl;
+  }
+  async function render() {
+    if (isHeif(name, mime)) {
+      const response = await fetch(source, { signal: controller.signal });
+      if (!response.ok) return;
+      const { heicTo } = await import("../vendor/heic-to.js");
+      if (!disposed)
+        show(
+          await heicTo({
+            blob: await response.blob(),
+            type: "image/jpeg",
+            quality: 0.7,
+          }),
+        );
+    } else if (!video) {
+      image.src = source;
+    } else {
+      preview = document.createElement("video");
+      const media = preview;
+      media.preload = "metadata";
+      media.muted = true;
+      media.playsInline = true;
+      let captured = false;
+      const capture = () => {
+        if (disposed || captured || media.readyState < 2) return;
+        captured = true;
+        const canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 160;
+        const scale = Math.max(256 / media.videoWidth, 160 / media.videoHeight);
+        canvas
+          .getContext("2d")
+          .drawImage(
+            media,
+            (256 - media.videoWidth * scale) / 2,
+            (160 - media.videoHeight * scale) / 2,
+            media.videoWidth * scale,
+            media.videoHeight * scale,
+          );
+        canvas.toBlob(show, "image/jpeg", 0.7);
+        releaseVideo();
+      };
+      media.addEventListener("loadeddata", capture);
+      media.addEventListener("seeked", capture);
+      media.addEventListener(
+        "loadedmetadata",
+        () => {
+          if (
+            !disposed &&
+            Number.isFinite(media.duration) &&
+            media.duration > 0
+          )
+            media.currentTime = Math.min(0.1, media.duration / 2);
+        },
+        { once: true },
+      );
+      media.addEventListener("error", releaseVideo, { once: true });
+      media.src = source;
+    }
+  }
+  render().catch(() => {});
+  return {
+    dispose() {
+      disposed = true;
+      controller.abort();
+      releaseVideo();
+      image.removeAttribute("src");
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    },
+  };
+}
+
 export async function mountMedia(stage, id, name, mime, video, reference) {
   const surface = stage.querySelector(".media-surface");
   const media = document.createElement(video ? "video" : "img");
@@ -248,7 +341,7 @@ export async function mountMedia(stage, id, name, mime, video, reference) {
   media.addEventListener(video ? "loadeddata" : "load", sample);
   if (video) timer = setInterval(sample, 350);
   const url = "/drive-content/" + encodeURIComponent(id);
-  if (/\.(heic|heif)$/i.test(name)) {
+  if (isHeif(name, mime)) {
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error("Unavailable");

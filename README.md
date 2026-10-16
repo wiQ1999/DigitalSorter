@@ -48,7 +48,7 @@ scripts/verify.sh
 
 - Jednostkowe: deterministyczne reguły Core; wymagane ≥80% linii i gałęzi.
 - Integracyjne: SQLite, trwałe sesje, szyfrowanie, OIDC z podpisami RSA i PKCE, tokeny, parowanie, publiczny adapter Drive i prawdziwe kontenery multimediów.
-- Przeglądarkowe: opublikowany WebAssembly, kontrolowany OAuth/Drive, Web i kontrakt adaptera TV, odtwarzanie, szukanie w filmie, HEIC/HEIF, nawigacja, pełny ekran, dynamiczne tło i układ mobilny.
+- Przeglądarkowe: opublikowany WebAssembly, kontrolowany OAuth/Drive, Web i kontrakt adaptera TV, odtwarzanie, szukanie w filmie, HEIC/HEIF, zastępcze miniatury, nawigacja, pełny ekran, dynamiczne tło i układ mobilny.
 - Natywne TV: osobny job CI uruchamia APK na emulatorze Android TV z KVM — start, parowanie, rzeczywisty `SecureStorage`, restart, formaty mediów i pilot. Wyniki zawierają zrzuty ekranu i logcat.
 - Dane testowe są syntetyczne; testy nie wymagają konta Google. `Testing` i host kontrolowanego OAuth służą wyłącznie testom i nie są częścią obrazu produkcyjnego.
 

@@ -67,9 +67,17 @@ public sealed class ControlledEndpoints(ControlledGoogle google, string origin, 
     ];
     public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
     {
+        var unavailableThumbnails = false;
         app.Use(async (context, continueRequest) =>
         {
             var path = context.Request.Path.Value ?? "";
+            if (path == "/test-drive/control" && context.Request.Method == "POST")
+            {
+                using var body = await JsonDocument.ParseAsync(context.Request.Body);
+                unavailableThumbnails = body.RootElement.GetProperty("unavailableThumbnails").GetBoolean();
+                context.Response.StatusCode = 204;
+                return;
+            }
             if (path == "/test-oauth/control" && context.Request.Method == "POST")
             {
                 using var body = await JsonDocument.ParseAsync(context.Request.Body);
@@ -103,6 +111,7 @@ public sealed class ControlledEndpoints(ControlledGoogle google, string origin, 
             }
             if (!path.StartsWith("/test-drive/", StringComparison.Ordinal)) { await continueRequest(); return; }
             if (google.RefreshError == "invalid_grant" || context.Request.Headers.Authorization != "Bearer controlled-access-token") { context.Response.StatusCode = 401; return; }
+            if (unavailableThumbnails && path.StartsWith("/test-drive/thumb/", StringComparison.Ordinal)) { context.Response.StatusCode = 403; return; }
             if (path == "/test-drive/files")
             {
                 var q = context.Request.Query["q"].ToString();

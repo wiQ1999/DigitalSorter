@@ -166,6 +166,50 @@ test(
 );
 
 test(
+  "Web: unavailable Drive thumbnails fall back to original photos and video frames",
+  { timeout: 150000 },
+  async () => {
+    await checked("client-generated-thumbnails", async (page) => {
+      await login(page);
+      async function unavailableThumbnails(value) {
+        await page.evaluate(async (unavailableThumbnails) => {
+          const response = await fetch("/test-drive/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ unavailableThumbnails }),
+          });
+          if (!response.ok)
+            throw new Error("Controlled Drive configuration failed");
+        }, value);
+      }
+      async function previewsReady() {
+        await page.waitForFunction(() => {
+          const images = [...document.querySelectorAll(".thumbnail img")];
+          return (
+            images.length === 5 &&
+            images.every((image) => image.complete && image.naturalWidth > 0)
+          );
+        });
+      }
+      await unavailableThumbnails(true);
+      try {
+        await load(page);
+        await previewsReady();
+        await next(page, 2);
+        await imageReady(page);
+        await previewsReady();
+        await page.screenshot({
+          path: "test-results/client-thumbnails.png",
+          fullPage: true,
+        });
+      } finally {
+        await unavailableThumbnails(false);
+      }
+    });
+  },
+);
+
+test(
   "Web: undated media is separate and unsupported files are ignored",
   { timeout: 120000 },
   async () => {
