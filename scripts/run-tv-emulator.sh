@@ -32,7 +32,7 @@ cleanup() {
 }
 trap cleanup EXIT
 "$sdk_dir/emulator/emulator" -avd DigitalSorterTV -port 5554 -no-window -accel on \
-  -gpu swiftshader -feature -Vulkan,-HardwareDecoder -no-audio -no-boot-anim -no-snapshot -no-metrics \
+  -gpu swangle -feature -Vulkan,-HardwareDecoder -no-audio -no-boot-anim -no-snapshot -no-metrics \
   -memory 3072 -cores 2 >test-results/native-emulator.log 2>&1 &
 emulator_pid=$!
 stable=0
