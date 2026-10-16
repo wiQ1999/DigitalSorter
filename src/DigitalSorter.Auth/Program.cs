@@ -22,9 +22,12 @@ var google = builder.Configuration.GetSection("Google").Get<GoogleOptions>() ?? 
 var dataDirectory = Path.GetFullPath(builder.Configuration["Broker:DataDirectory"] ?? Path.Combine(builder.Environment.ContentRootPath, "data"));
 Directory.CreateDirectory(dataDirectory);
 var publicOrigin = builder.Configuration["Broker:PublicOrigin"] ?? "https://localhost:7043";
-if (!Uri.TryCreate(publicOrigin, UriKind.Absolute, out var origin) || origin.Scheme != "https" || origin.AbsolutePath != "/" ||
+if (!Uri.TryCreate(publicOrigin, UriKind.Absolute, out var origin) ||
+    (origin.Scheme != "https" && !(builder.Environment.IsDevelopment() && origin.Scheme == "http" && origin.IsLoopback)) || origin.AbsolutePath != "/" ||
     !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment) || !string.IsNullOrEmpty(origin.UserInfo))
-    throw new InvalidOperationException("Broker:PublicOrigin must be an HTTPS origin without a path.");
+    throw new InvalidOperationException("Broker:PublicOrigin must be an HTTPS origin without a path; Development also permits loopback HTTP.");
+var localHttp = origin.Scheme == "http";
+var cookieSecurity = localHttp ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
 builder.Configuration["Broker:PublicOrigin"] = origin.GetLeftPart(UriPartial.Authority);
 var encryptionKey = builder.Configuration["Broker:TokenEncryptionKey"];
 if (string.IsNullOrEmpty(encryptionKey))
@@ -64,8 +67,8 @@ builder.Services.AddAuthorization();
 builder.Services.AddAntiforgery(o =>
 {
     o.HeaderName = "X-CSRF-TOKEN";
-    o.Cookie.Name = "__Host-DigitalSorter.Csrf";
-    o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    o.Cookie.Name = localHttp ? "DigitalSorter.Development.Csrf" : "__Host-DigitalSorter.Csrf";
+    o.Cookie.SecurePolicy = cookieSecurity;
     o.Cookie.SameSite = SameSiteMode.Strict;
 });
 builder.Services.AddAuthentication(o =>
@@ -76,9 +79,9 @@ builder.Services.AddAuthentication(o =>
 .AddScheme<AuthenticationSchemeOptions, DeviceAuthentication>("Device", _ => { })
 .AddCookie("Web", o =>
 {
-    o.Cookie.Name = "__Host-DigitalSorter.Session";
+    o.Cookie.Name = localHttp ? "DigitalSorter.Development.Session" : "__Host-DigitalSorter.Session";
     o.Cookie.HttpOnly = true;
-    o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    o.Cookie.SecurePolicy = cookieSecurity;
     o.Cookie.SameSite = SameSiteMode.Lax;
     o.ExpireTimeSpan = TimeSpan.FromDays(30);
     o.SlidingExpiration = false;
@@ -99,6 +102,13 @@ builder.Services.AddAuthentication(o =>
     o.ClientSecret = google.ClientSecret;
     o.ResponseType = OpenIdConnectResponseType.Code;
     o.ResponseMode = OpenIdConnectResponseMode.Query;
+    if (localHttp)
+    {
+        o.CorrelationCookie.SecurePolicy = cookieSecurity;
+        o.CorrelationCookie.SameSite = SameSiteMode.Lax;
+        o.NonceCookie.SecurePolicy = cookieSecurity;
+        o.NonceCookie.SameSite = SameSiteMode.Lax;
+    }
     o.CallbackPath = "/auth/callback";
     o.MapInboundClaims = false;
     o.Scope.Clear(); o.Scope.Add("openid"); o.Scope.Add("https://www.googleapis.com/auth/drive.readonly");
@@ -158,9 +168,16 @@ var app = builder.Build();
 await using (var scope = app.Services.CreateAsyncScope())
     await scope.ServiceProvider.GetRequiredService<BrokerDb>().Database.EnsureCreatedAsync();
 app.UseForwardedHeaders();
+if (localHttp) app.Use(async (c, next) =>
+{
+    if ((c.Connection.RemoteIpAddress is { } remote && !IPAddress.IsLoopback(remote)) ||
+        c.Request.Scheme != "http" || !c.Request.Host.Equals(new HostString(origin.Authority)))
+    { c.Response.StatusCode = StatusCodes.Status400BadRequest; return; }
+    await next();
+});
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.UseExceptionHandler();
-app.UseHttpsRedirection();
+if (!localHttp) app.UseHttpsRedirection();
 app.Use(async (c, next) =>
 {
     c.Response.Headers["X-Content-Type-Options"] = "nosniff";

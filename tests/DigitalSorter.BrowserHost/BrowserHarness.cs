@@ -13,11 +13,21 @@ public static class BrowserHarness
     public static async Task Main()
     {
         var port = int.Parse(Environment.GetEnvironmentVariable("TEST_PORT") ?? "7443");
-        var certificate = Environment.GetEnvironmentVariable("TEST_CERTIFICATE") ?? throw new InvalidOperationException("Set TEST_CERTIFICATE to the temporary test PFX.");
-        using var factory = new BrowserFactory("https://localhost:" + port, Environment.GetEnvironmentVariable("TEST_FIXTURES") ?? "tests/fixtures");
-        factory.UseKestrel(options => options.Listen(IPAddress.Any, port, listen => listen.UseHttps(certificate)));
+        var localHttp = Environment.GetEnvironmentVariable("TEST_HTTP") == "1";
+        var origin = (localHttp ? "http" : "https") + "://localhost:" + port;
+        using var factory = new BrowserFactory(origin, Environment.GetEnvironmentVariable("TEST_FIXTURES") ?? "tests/fixtures");
+        if (localHttp)
+        {
+            factory.EnvironmentName = "Development";
+            factory.UseKestrel(options => options.ListenLocalhost(port));
+        }
+        else
+        {
+            var certificate = Environment.GetEnvironmentVariable("TEST_CERTIFICATE") ?? throw new InvalidOperationException("Set TEST_CERTIFICATE to the temporary test PFX.");
+            factory.UseKestrel(options => options.Listen(IPAddress.Any, port, listen => listen.UseHttps(certificate)));
+        }
         factory.StartServer();
-        Console.WriteLine("Controlled OAuth/Drive test host ready at https://localhost:" + port);
+        Console.WriteLine("Controlled OAuth/Drive test host ready at " + origin);
         var stop = new TaskCompletionSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.TrySetResult(); };
         using var terminate = OperatingSystem.IsWindows() ? null : PosixSignalRegistration.Create(PosixSignal.SIGTERM,
@@ -29,7 +39,7 @@ public static class BrowserHarness
 public sealed class BrowserFactory : BrokerFactory
 {
     private readonly string _fixtures;
-    public BrowserFactory(string origin, string fixtures)
+    public BrowserFactory(string origin, string fixtures) : base(Environment.GetEnvironmentVariable("TEST_DATA_DIRECTORY"))
     {
         PublicOrigin = origin; _fixtures = Path.GetFullPath(fixtures);
         Google.AuthorizationEndpoint = origin + "/test-oauth/authorize";

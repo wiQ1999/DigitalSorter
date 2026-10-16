@@ -95,6 +95,7 @@ public class BrokerFactory : WebApplicationFactory<Program>
     public TestClock Clock { get; } = new();
     public string? Failure { get; private set; }
     public string PublicOrigin { get; set; } = "https://localhost";
+    public string EnvironmentName { get; set; } = "Testing";
     public BrokerFactory(string? dataDirectory = null) => DataDirectory = dataDirectory ?? Path.Combine(Path.GetTempPath(), "digitalsorter-tests-" + Guid.NewGuid());
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -102,7 +103,7 @@ public class BrokerFactory : WebApplicationFactory<Program>
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "DigitalSorter.slnx"))) root = root.Parent;
         if (root is null) throw new InvalidOperationException("Run integration tests from the DigitalSorter checkout.");
         builder.UseContentRoot(Path.Combine(root.FullName, "src", "DigitalSorter.Auth"));
-        builder.UseEnvironment("Testing");
+        builder.UseEnvironment(EnvironmentName);
         builder.UseSetting("Broker:DataDirectory", DataDirectory);
         builder.UseSetting("Broker:PublicOrigin", PublicOrigin);
         builder.UseSetting("Broker:TokenEncryptionKey", Convert.ToBase64String(Enumerable.Repeat((byte)17, 32).ToArray()));
@@ -122,7 +123,7 @@ public class BrokerFactory : WebApplicationFactory<Program>
             });
         });
     }
-    public HttpClient Client() => CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new("https://localhost"), AllowAutoRedirect = false });
+    public HttpClient Client() => CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new(PublicOrigin), AllowAutoRedirect = false });
     public async Task<HttpResponseMessage> Login(HttpClient client, string subject = "controlled-user", bool consent = false, string returnUrl = "/")
     {
         var challenge = await client.GetAsync("/auth/login?returnUrl=" + Uri.EscapeDataString(returnUrl) + (consent ? "&consent=true" : ""));
