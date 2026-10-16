@@ -1,6 +1,6 @@
 # DigitalSorter
 
-Ciemna galeria zdjęć i filmów z Google Drive, sortowana według daty wykonania. Web i Android TV korzystają z tego samego interfejsu; multimedia są pobierane bezpośrednio z Drive.
+Galeria zdjęć i filmów z Google Drive, sortowana według daty wykonania. Web i Android TV korzystają z tego samego interfejsu; multimedia są pobierane bezpośrednio z Drive.
 
 ## Uruchomienie
 
@@ -70,4 +70,4 @@ Workflow `Validate` buduje aplikacje, wykonuje piramidę testów i publikuje art
 
 Materiały bez poprawnej daty trafiają do osobnej listy. Daty Drive `createdTime`/`modifiedTime` nie zastępują daty wykonania. Daty bez strefy są interpretowane jako UTC. Brak obsługi konkretnego kodeka lub uszkodzony plik daje komunikat w odtwarzaczu.
 
-Licencje dekodera HEIC: [informacje i źródła](src/DigitalSorter.Web/wwwroot/licenses/THIRD_PARTY_NOTICES.txt); publikowane pod `/licenses/`.
+Dekoder HEIC/HEIF `heic-to` korzysta z LGPL 3.0; dołączony tekst GPL 3.0 stanowi część warunków LGPL. [Informacje, licencje i źródła zależności](src/DigitalSorter.Web/wwwroot/licenses/THIRD_PARTY_NOTICES.txt) są publikowane pod `/licenses/` ze wspólnego projektu Web, także dla Android TV. Nie określają licencji własnego kodu DigitalSorter; repozytorium nie zawiera odrębnej licencji tego kodu.

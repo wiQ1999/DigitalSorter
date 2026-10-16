@@ -43,7 +43,7 @@
 - Licznik pokazuje numer aktualnego materiału i liczbę materiałów na bieżącej liście.
 - Aktywny materiał można wyświetlić w trybie pełnoekranowym.
 - Aplikacja informuje o materiałach niedostępnych lub nieobsługiwanych.
-- Web i TV mają wspólny ciemny interfejs z niebieskimi, zielonymi i żółtymi akcentami; bez przełączania motywu.
+- Web i TV mają wspólny interfejs; paletę określa [architektura](ARCHITECTURE.md#aplikacja-webowa).
 - Poza pełnym ekranem tło materiału dopasowuje się do kolorów jego brzegów, także podczas odtwarzania filmu.
 
 ## Ochrona danych
