@@ -462,6 +462,24 @@ test(
           true,
           "TV keeps material, navigation and thumbnails on screen at both display densities",
         );
+        assert.equal(
+          await tvPage.evaluate(() => {
+            const stage = document
+              .querySelector(".media-stage")
+              .getBoundingClientRect();
+            const image = document
+              .querySelector(".media-surface img")
+              .getBoundingClientRect();
+            return (
+              image.top >= stage.top &&
+              image.bottom <= stage.bottom &&
+              image.left >= stage.left &&
+              image.right <= stage.right
+            );
+          }),
+          true,
+          "TV contains the complete photo inside the viewer without clipping",
+        );
       }
       await tvPage.screenshot({
         path: "test-results/tv-gallery.png",

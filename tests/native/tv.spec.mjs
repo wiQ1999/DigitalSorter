@@ -172,6 +172,24 @@ test(
         true,
         "Native TV keeps the material and upcoming previews inside the screen",
       );
+      assert.equal(
+        await page.evaluate(() => {
+          const stage = document
+            .querySelector(".media-stage")
+            .getBoundingClientRect();
+          const image = document
+            .querySelector(".media-surface img")
+            .getBoundingClientRect();
+          return (
+            image.top >= stage.top &&
+            image.bottom <= stage.bottom &&
+            image.left >= stage.left &&
+            image.right <= stage.right
+          );
+        }),
+        true,
+        "Native TV contains the full photo inside the viewer",
+      );
       await device.screenshot({ path: "test-results/native-tv-photos.png" });
       await page.getByTestId("media-stage").focus();
       await device.shell("input keyevent KEYCODE_DPAD_RIGHT");
