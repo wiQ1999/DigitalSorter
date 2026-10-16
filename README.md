@@ -70,4 +70,8 @@ Workflow `Validate` buduje aplikacje, wykonuje piramidę testów i publikuje art
 
 Materiały bez poprawnej daty trafiają do osobnej listy. Daty Drive `createdTime`/`modifiedTime` nie zastępują daty wykonania. Daty bez strefy są interpretowane jako UTC. Brak obsługi konkretnego kodeka lub uszkodzony plik daje komunikat w odtwarzaczu.
 
-Dekoder HEIC/HEIF `heic-to` korzysta z LGPL 3.0; dołączony tekst GPL 3.0 stanowi część warunków LGPL. [Informacje, licencje i źródła zależności](src/DigitalSorter.Web/wwwroot/licenses/THIRD_PARTY_NOTICES.txt) są publikowane pod `/licenses/` ze wspólnego projektu Web, także dla Android TV. Nie określają licencji własnego kodu DigitalSorter; repozytorium nie zawiera odrębnej licencji tego kodu.
+## Licencja
+
+Własny kod i materiały repozytorium obejmuje [DigitalSorter Personal Use License 1.0](LICENSE.md) — licencja własna, wyłącznie do użytku prywatnego i niekomercyjnego osób fizycznych oraz ich gospodarstw domowych. Użycie komercyjne, zawodowe i organizacyjne wymaga osobnej zgody właścicieli praw.
+
+Zależności zachowują własne licencje. Dekoder HEIC/HEIF `heic-to` korzysta z LGPL 3.0, której częścią są postanowienia GPL 3.0. [Informacje, licencje i źródła dekodera](src/DigitalSorter.Web/wwwroot/licenses/THIRD_PARTY_NOTICES.txt) pozostają w Web i są publikowane pod `/licenses/` dla Web oraz Android TV.
