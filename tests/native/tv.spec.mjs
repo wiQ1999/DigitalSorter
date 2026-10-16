@@ -156,6 +156,23 @@ test(
       console.log(
         "Native photo and video previews work without Drive thumbnail links",
       );
+      assert.equal(
+        await page.evaluate(() =>
+          [".media-stage", ".counter", ".thumbnail-strip"].every((selector) => {
+            const bounds = document
+              .querySelector(selector)
+              .getBoundingClientRect();
+            return (
+              bounds.top >= 0 &&
+              bounds.bottom <= innerHeight &&
+              bounds.right <= innerWidth
+            );
+          }),
+        ),
+        true,
+        "Native TV keeps the material and upcoming previews inside the screen",
+      );
+      await device.screenshot({ path: "test-results/native-tv-photos.png" });
       await page.getByTestId("media-stage").focus();
       await device.shell("input keyevent KEYCODE_DPAD_RIGHT");
       await page.waitForFunction(() =>

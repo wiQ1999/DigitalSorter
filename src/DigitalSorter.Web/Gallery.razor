@@ -3,7 +3,7 @@
 @inject IMediaLibrarySource Library
 @inject NavigationManager Navigation
 
-<div class="app-shell @(_gallery.IsFullscreen ? "fullscreen" : "") @(_busy ? "is-busy" : "")">
+<div class="app-shell @(_gallery.IsFullscreen ? "fullscreen" : "") @(_gallery.Current is not null ? "has-media" : "") @(_busy ? "is-busy" : "")">
     <header class="app-header">
         <a href="/" class="brand"><span class="brand-mark"></span>DigitalSorter<span class="brand-divider"></span><span class="brand-caption">chwile, po kolei</span></a>
         <div class="account-actions"><span class="privacy"><i></i>Tylko do odczytu</span>

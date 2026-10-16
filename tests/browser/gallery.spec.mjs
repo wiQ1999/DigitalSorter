@@ -439,15 +439,30 @@ test(
       await tvPage.reload();
       await tvPage.getByRole("heading", { name: "Twoje źródła" }).waitFor();
       await load(tvPage);
-      assert.equal(
-        await tvPage
-          .locator(".thumbnail-strip")
-          .evaluate(
-            (strip) => strip.getBoundingClientRect().bottom <= innerHeight,
+      for (const viewport of [
+        { width: 1920, height: 1080 },
+        { width: 960, height: 540 },
+      ]) {
+        await tvPage.setViewportSize(viewport);
+        assert.equal(
+          await tvPage.evaluate(() =>
+            [".media-stage", ".counter", ".thumbnail-strip"].every(
+              (selector) => {
+                const bounds = document
+                  .querySelector(selector)
+                  .getBoundingClientRect();
+                return (
+                  bounds.top >= 0 &&
+                  bounds.bottom <= innerHeight &&
+                  bounds.right <= innerWidth
+                );
+              },
+            ),
           ),
-        true,
-        "TV keeps the current material, navigation and upcoming thumbnails on screen",
-      );
+          true,
+          "TV keeps material, navigation and thumbnails on screen at both display densities",
+        );
+      }
       await tvPage.screenshot({
         path: "test-results/tv-gallery.png",
         fullPage: true,

@@ -981,6 +981,91 @@ input::placeholder {
 #blazor-error-ui a {
   text-decoration: underline;
 }
+@media (max-height: 700px) {
+  .tv .has-media:not(.fullscreen) {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .tv .has-media:not(.fullscreen) .app-header {
+    height: 48px;
+    flex-shrink: 0;
+  }
+  .tv .has-media:not(.fullscreen) .workspace {
+    height: calc(100dvh - 48px);
+    min-height: 0;
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .tv .has-media:not(.fullscreen) .sidebar {
+    overflow: auto;
+    padding: 14px 16px;
+  }
+  .tv .has-media:not(.fullscreen) .source-note {
+    display: none;
+  }
+  .tv .has-media:not(.fullscreen) .gallery-main {
+    height: 100%;
+    min-height: 0;
+    padding: 12px 16px;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  }
+  .tv .has-media:not(.fullscreen) .gallery-heading {
+    margin-bottom: 6px;
+  }
+  .tv .has-media:not(.fullscreen) .gallery-heading h1 {
+    font-size: 1.3rem;
+    margin-top: 3px;
+  }
+  .tv .has-media:not(.fullscreen) button,
+  .tv .has-media:not(.fullscreen) input {
+    min-height: 32px;
+  }
+  .tv .has-media:not(.fullscreen) input[type="checkbox"] {
+    min-height: 20px;
+  }
+  .tv .has-media:not(.fullscreen) .list-tabs {
+    margin-bottom: 8px;
+  }
+  .tv .has-media:not(.fullscreen) .list-tabs button {
+    padding: 6px 0;
+  }
+  .tv .has-media:not(.fullscreen) .viewer {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .tv .has-media:not(.fullscreen) .media-stage {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+  }
+  .tv .has-media:not(.fullscreen) .viewer-toolbar {
+    flex-shrink: 0;
+    padding: 6px 12px;
+  }
+  .tv .has-media:not(.fullscreen) .fullscreen-button {
+    height: 32px;
+    padding: 2px 8px;
+    font-size: 1.3rem;
+  }
+  .tv .has-media:not(.fullscreen) .gallery-navigation {
+    padding: 6px 0;
+  }
+  .tv .has-media:not(.fullscreen) .section-heading {
+    margin-bottom: 4px;
+  }
+  .tv .has-media:not(.fullscreen) .thumbnail-strip {
+    min-height: 0;
+    height: 56px;
+    gap: 8px;
+  }
+  .tv .has-media:not(.fullscreen) .thumbnail {
+    height: 56px;
+    width: calc((100% - 32px) / 5);
+    aspect-ratio: auto;
+  }
+}
 @media (max-width: 1000px) {
   .brand-caption,
   .brand-divider,
