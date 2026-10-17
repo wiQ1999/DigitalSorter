@@ -4,9 +4,10 @@
 
 - `DigitalSorter.Core` — logika aplikacji, walidacja metadanych, klasyfikowanie materiałów i sortowanie.
 - `DigitalSorter.Data.GoogleDrive` — odczyt plików i metadanych z Google Drive.
-- `DigitalSorter.Auth` — backend pełniący rolę brokera OAuth dla aplikacji webowej.
+- `DigitalSorter.Auth` — wspólny backend OAuth i sesji dla aplikacji webowej oraz Android TV.
 - `DigitalSorter.AndroidTV` — warstwa prezentacji Android TV oparta na .NET MAUI.
 - `DigitalSorter.Web` — warstwa prezentacji dla przeglądarki oparta na standalone Blazor WebAssembly.
+- `DigitalSorter.Contracts` — kontrakty HTTP brokera, niezależne od Core.
 
 ## Core
 
@@ -17,11 +18,31 @@
 
 ## Zależności
 
-- Warstwy prezentacji korzystają wyłącznie z interfejsów i modeli Core.
+- Warstwy prezentacji korzystają z interfejsów i modeli Core oraz adapterów sesji brokera.
 - Warstwa danych implementuje interfejsy zdefiniowane w Core.
 - Konfiguracja aplikacji łączy implementacje warstw przez wstrzykiwanie zależności.
 - Logika dostępu do Google Drive nie występuje w Core ani w warstwach prezentacji.
-- Broker OAuth odpowiada wyłącznie za uwierzytelnianie aplikacji webowej, sesję użytkownika i zarządzanie tokenami Google.
+- Broker obsługuje autoryzację Google, sesje klientów i parowanie TV; nie realizuje logiki Core ani przesyłania multimediów.
+
+## Wspólny broker OAuth
+
+- Web i Android TV korzystają z jednej implementacji OAuth Google w `DigitalSorter.Auth`: zgoda, walidacja `state` i callbacku, wymiana kodu, zapis, odświeżanie i unieważnianie tokenów.
+- Google OAuth 2.0 Authorization Code Flow używa `access_type=offline` oraz zakresów `openid` i `drive.readonly`; konto jest identyfikowane przez zweryfikowane `sub` OpenID Connect.
+- Web i TV współdzielą magazyn poświadczeń Google i usługę wydawania tokenów `access_token`; osobne są sesje webowe, sesje urządzeń i endpointy parowania TV.
+- Backend trwale przechowuje zaszyfrowany `refresh_token`, identyfikator konta, klienta OAuth i przyznane zakresy; klucze szyfrowania oraz `client_secret` pozostają w magazynie sekretów.
+- `refresh_token` i Google `client_secret` nie trafiają do przeglądarki ani TV. Klient pobiera `access_token` przez HTTPS, przechowuje go w pamięci i wywołuje Drive bezpośrednio.
+- Odświeżanie dostępu nie wymaga ponownej zgody, dopóki autoryzacja Google pozostaje ważna; brak nowego `refresh_token` w odpowiedzi nie usuwa zapisanego tokenu.
+- Utrata autoryzacji Google wymaga ponownego połączenia konta. Wylogowanie klienta unieważnia tylko jego sesję; odłączenie Google cofa zgodę i usuwa poświadczenia oraz sesje powiązanych klientów.
+
+## Android TV — parowanie przez telefon
+
+- Aplikacja MAUI hostuje wspólny interfejs `DigitalSorter.Web` w WebView; adapter natywny zapewnia `SecureStorage`, konfigurację serwera i obsługę Wstecz. Logowanie Google odbywa się na telefonie.
+- TV inicjuje parowanie i wyświetla QR oraz krótki kod; sekret żądania pozostaje na TV.
+- Użytkownik otwiera stronę brokera na telefonie, autoryzuje konto Google wspólnym przepływem OAuth i potwierdza powiązanie telewizora.
+- Przed zatwierdzeniem broker sprawdza autoryzację Google; ponowna zgoda zachowuje kod parowania.
+- Kod parowania jest jednorazowy, ma krótki termin ważności i limit prób. Odbiór sesji wymaga sekretu pierwotnego żądania TV.
+- TV odpytuje broker o wynik i po zatwierdzeniu otrzymuje niezależną sesję urządzenia. Parowanie jest mechanizmem brokera, a nie Google Device Flow.
+- Poświadczenie sesji TV jest zapisywane przez MAUI `SecureStorage`, wykluczone z kopii zapasowych i usuwane przy wylogowaniu; utrata magazynu wymaga ponownego parowania.
 
 ## Aplikacja webowa
 
@@ -30,28 +51,22 @@
 - Stylowanie wykorzystuje CSS, w tym CSS isolation dla stylów przypisanych do komponentów.
 - Logika interfejsu i stan aplikacji są realizowane przede wszystkim w C#; JavaScript jest ograniczony do niewielkich modułów wywoływanych przez JS interop, gdy wymagają tego API przeglądarki lub biblioteki zewnętrzne.
 - TypeScript ani dodatkowy framework JavaScript nie są częścią podstawowego stosu technologicznego.
-- Opublikowane pliki statyczne są hostowane przez GitHub Pages projektu.
-- `DigitalSorter.Auth` działa jako niezależny backend OAuth/token broker; nie hostuje interfejsu ani logiki biznesowej Core.
-- Wywołania Google Drive są wykonywane bezpośrednio z przeglądarki, dlatego zdjęcia i filmy nie przechodzą przez backend.
-- Budowanie i publikowanie frontendu realizuje GitHub Actions z użyciem `dotnet publish`.
+- Interfejs Web i TV ma stałą ciemną paletę z akcentami niebieskim, zielonym i żółtym. TV obsługuje nawigację pilotem.
+- Tło odtwarzacza próbkuje kolory z brzegów bieżącej klatki zdjęcia lub filmu; pełny ekran ma czarne tło.
+- Adapter przeglądarkowy w `DigitalSorter.Data.GoogleDrive` strumieniuje żądania Range z nagłówkiem OAuth przez service worker. Nie zapisuje plików ani tokenów w cache; HEIC/HEIF dekoduje klient.
+- Gdy miniatura Drive jest niedostępna lub blokowana przez CORS, klient tworzy podgląd z oryginalnego zdjęcia albo klatki filmu; bez pośrednictwa backendu.
+- Sesja webowa używa cookie `HttpOnly`, `Secure`, z określoną ważnością, polityką `SameSite` i ochroną CSRF.
 
-### Broker OAuth
+## Hosting i wdrożenie
 
-- Dostęp webowy wykorzystuje Google OAuth 2.0 Authorization Code Flow z `access_type=offline` oraz zakresem `drive.readonly`.
-- Backend wymienia kod autoryzacyjny na tokeny i trwale przechowuje wyłącznie zaszyfrowany `refresh_token` oraz dane wymagane do powiązania go z użytkownikiem.
-- Sesja aplikacji webowej jest utrzymywana przez bezpieczne cookie `HttpOnly` i `Secure`.
-- Po ponownym uruchomieniu aplikacji lub wygaśnięciu `access_token` backend używa `refresh_token` do uzyskania nowego tokenu bez ponownej zgody użytkownika, dopóki autoryzacja pozostaje ważna.
-- `access_token` jest przekazywany do `DigitalSorter.Web`, przechowywany wyłącznie w pamięci aplikacji i używany do bezpośrednich wywołań Google Drive API.
-- `refresh_token` i OAuth `client_secret` nigdy nie są przekazywane do przeglądarki.
-- Unieważnienie autoryzacji wymaga ponownego połączenia konta Google.
-
-### GitHub Pages — wymagania techniczne
-
-- Aplikacja jest publikowana jako Project Pages pod ścieżką `/DigitalSorter/`, dlatego `base href` musi wskazywać `/DigitalSorter/`; wartość jest ustawiana w procesie publikacji.
-- GitHub Pages nie obsługuje reguły SPA fallback do `index.html`; bezpośrednie wejście lub odświeżenie trasy Blazor wymaga `404.html`, który przekierowuje do aplikacji i odtwarza pierwotną trasę.
-- Publikacja zawiera plik `.nojekyll`, aby katalog Blazor `_framework` nie był pomijany przez przetwarzanie Jekyll.
-- Pliki JavaScript publikacji muszą być chronione przed zmianą zakończeń linii przez Git, np. przez odpowiednią regułę w `.gitattributes`, aby nie naruszyć kontroli integralności zasobów Blazor.
-- Backend OAuth musi zezwalać na żądania wyłącznie z dozwolonych originów aplikacji webowej i obsługiwać HTTPS.
+- Hosting uruchamia backend ASP.NET Core na .NET 10 i jednocześnie udostępnia pliki `DigitalSorter.Web`; dostawca pozostaje dowolny.
+- Frontend i backend działają pod jednym originem HTTPS (schemat, host i port); komunikacja web–broker używa adresów względnych.
+- HTTPS obowiązuje również w testach Web i TV. Procedury certyfikatów i lokalnego backendu: [wdrożenie](DEPLOYMENT.md); instalacja i publikacja: [Android TV](ANDROID_TV.md).
+- Ścieżki: `/` — frontend z `base href="/"`, `/auth/` — OAuth i sesja webowa, `/api/` — API brokera, `/pair` — zatwierdzanie TV na telefonie.
+- Routing SPA zwraca `index.html` dla tras frontendu; ścieżki API i OAuth nie podlegają temu fallbackowi.
+- Opublikowane zasoby są udostępniane bez zmiany zawartości, z właściwymi typami MIME i obsługą kompresji.
+- Magazyny poświadczeń, sesji i sekretów zachowują dane po restarcie oraz ponownym wdrożeniu.
+- GitHub Actions buduje i wdraża frontend oraz backend razem, z użyciem `dotnet publish`.
 
 ## Standard testów
 
@@ -66,6 +81,7 @@
 
 - Warstwa Google Drive jest testowana przez jej publiczne interfejsy z użyciem kontrolowanych danych testowych.
 - Testy obejmują uwierzytelnianie, odświeżanie tokenów, wiele folderów, brak metadanych oraz błędy dostępu i sieci.
+- Testy brokera obejmują wspólny cykl OAuth dla obu klientów, odświeżanie po restarcie, ważność i jednokrotność parowania, powiązanie sesji z właściwym TV oraz wylogowanie i odłączenie Google.
 - Testy nie mogą korzystać z danych rzeczywistych użytkowników.
 
 ### Pozostałe warstwy

@@ -6,6 +6,18 @@ public static class MauiProgram
     {
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>();
+#if DEBUG
+        Android.Webkit.WebView.SetWebContentsDebuggingEnabled(true);
+#endif
+
+        Microsoft.Maui.Handlers.WebViewHandler.Mapper.AppendToMapping("DigitalSorter", (handler, _) =>
+        {
+            handler.PlatformView.Settings.JavaScriptEnabled = true;
+            handler.PlatformView.Settings.DomStorageEnabled = true;
+            handler.PlatformView.Settings.AllowFileAccess = false;
+            handler.PlatformView.Settings.MixedContentMode = Android.Webkit.MixedContentHandling.NeverAllow;
+            handler.PlatformView.AddJavascriptInterface(new SecureStorageBridge(handler.PlatformView), "DigitalSorterNative");
+        });
 
         return builder.Build();
     }

@@ -1,0 +1,190 @@
+@implements IAsyncDisposable
+@inject BrokerClient Broker
+@inject IMediaLibrarySource Library
+@inject NavigationManager Navigation
+
+<div class="app-shell @(_gallery.IsFullscreen ? "fullscreen" : "") @(_gallery.Current is not null ? "has-media" : "") @(_busy ? "is-busy" : "")">
+    <header class="app-header">
+        <a href="/" class="brand"><span class="brand-mark"></span>DigitalSorter<span class="brand-divider"></span><span class="brand-caption">chwile, po kolei</span></a>
+        <div class="account-actions"><span class="privacy"><i></i>Tylko do odczytu</span>
+        @if (Broker.Session.Authenticated)
+        {
+            <span class="account-name">@Broker.Session.DisplayName</span>
+            <button class="icon-button" title="Wyloguj tę sesję" @onclick="() => SignOut(false)">Wyloguj</button>
+            <button class="icon-button danger" title="Odłącz Google we wszystkich urządzeniach" @onclick="() => _confirmDisconnect = true">Odłącz konto</button>
+        }
+        </div>
+    </header>
+    @if (_initializing) { <main class="loading-state" role="status"><span class="spinner"></span>Przygotowuję bibliotekę…</main> }
+    else if (!Broker.Session.Authenticated)
+    {
+        <main class="welcome">
+            <div class="welcome-copy"><span class="eyebrow">TWOJA PRYWATNA GALERIA</span><h1>Każda chwila.<br /><span>Na swoim miejscu.</span></h1><p>Zdjęcia i filmy z Google Drive, ułożone według daty wykonania. Bez zmieniania Twoich plików.</p>
+            @if (!Broker.IsTv)
+            { <a class="button primary google-button" href="@(_reauthorize ? "/auth/login?consent=true" : "/auth/login")"><span class="google-g">G</span>Połącz Google Drive<span>→</span></a><a class="text-link" href="/pair">Połącz telewizor</a> }
+            else if (_pairing is null)
+            { <button class="button primary" @onclick="StartPairing">Połącz przez telefon</button> }
+            else
+            {
+                <div class="tv-pairing"><img src="@("/api/pair/qr?uri=" + Uri.EscapeDataString(_pairing.VerificationUri))" alt="Kod QR do połączenia telewizora" /><div><p>Zeskanuj kod telefonem lub otwórz</p><strong>@(new Uri(_pairing.VerificationUri).GetLeftPart(UriPartial.Authority))/pair</strong><div class="pair-code">@_pairing.UserCode</div><small>@_pairStatus</small><button class="text-link" @onclick="StartPairing">Nowy kod</button></div></div>
+            }
+            <div class="welcome-trust"><span>✓ Oryginały bez zmian</span><span>✓ Prywatne połączenie</span></div></div>
+            <div class="welcome-art" aria-hidden="true"><div class="art-frame frame-back"><div class="art-sky"></div></div><div class="art-frame frame-front"><div class="art-mountain"></div><span>Twoja następna podróż w czasie</span></div><span class="art-dot dot-green"></span><span class="art-dot dot-yellow"></span><span class="art-dot dot-blue"></span></div>
+        </main>
+    }
+    else
+    {
+        <div class="workspace">
+            <aside class="sidebar">
+                <span class="eyebrow">BIBLIOTEKA</span><h2>Twoje źródła<span class="source-count">@_selected.Count</span></h2>
+                <p class="muted">Wybierz foldery z Google Drive.</p>
+                <div class="folder-location"><button class="text-link" @onclick="Root">Mój dysk</button>@if (_folderStack.Count > 0) { <button class="text-link" @onclick="Up">↑ Wstecz</button> }</div>
+                <div class="folder-list">
+                @foreach (var folder in _folders)
+                {
+                    <div class="folder-row"><label><input type="checkbox" checked="@_selected.ContainsKey(folder.Id)" @onchange="e => SelectFolder(folder, (bool)e.Value!)" /><span class="folder-icon">▰</span><span>@folder.Name</span></label><button class="icon-button" aria-label="@("Otwórz folder " + folder.Name)" @onclick="() => OpenFolder(folder.Id)">›</button></div>
+                }
+                @if (_folders.Count == 0) { <p class="muted small">Brak podfolderów. Możesz dodać źródło za pomocą linku.</p> }
+                </div>
+                <label class="input-label" for="folder-link">Link lub identyfikator folderu</label><div class="folder-add"><input id="folder-link" @bind="_folderLink" placeholder="drive.google.com/drive/folders/…" /><button class="icon-button" aria-label="Dodaj folder" @onclick="AddFolder">+</button></div>
+                @foreach (var folder in _selected.Values)
+                { <div class="selected-source"><span>▰ @folder.Name</span><button class="icon-button" aria-label="@("Usuń źródło " + folder.Name)" @onclick="() => _selected.Remove(folder.Id)">×</button></div> }
+                <button class="button primary load-button" disabled="@(_busy || _selected.Count == 0)" @onclick="Load">@(_busy ? "Odczytuję metadane…" : "Otwórz kolekcję")<span>→</span></button>
+                @if (_busy) { <button class="text-link" @onclick="() => _operation?.Cancel()">Anuluj odczyt</button> }
+                <div class="source-note"><span>◈</span><p>Sortowanie wyłącznie według daty wykonania. Twoje pliki pozostają bez zmian.</p></div>
+            </aside>
+            <main class="gallery-main">
+                <div class="gallery-heading"><div><span class="eyebrow">TWOJE WSPOMNIENIA</span><h1>W naturalnej kolejności<span class="heading-dot">.</span></h1></div><span class="collection-count">@_gallery.Items.Count materiałów</span></div>
+                <div class="list-tabs" role="tablist" aria-label="Lista materiałów"><button role="tab" aria-selected="@(_gallery.ActiveList == MediaList.Chronological)" class="@(_gallery.ActiveList == MediaList.Chronological ? "active" : "")" @onclick="() => SwitchList(MediaList.Chronological)">Chronologicznie</button><button role="tab" aria-selected="@(_gallery.ActiveList == MediaList.Invalid)" class="@(_gallery.ActiveList == MediaList.Invalid ? "active" : "")" @onclick="() => SwitchList(MediaList.Invalid)">Bez poprawnej daty <span>@_gallery.InvalidCount</span></button></div>
+                @if (_gallery.Current is { } current)
+                {
+                    <div class="viewer" data-testid="viewer"><MediaPlayer @key="(current.Id, _loadGeneration)" Asset="current" />
+                        <div class="viewer-toolbar"><div class="media-caption"><span class="media-kind">@(current.Kind == MediaKind.Video ? "FILM" : "ZDJĘCIE")</span><strong>@current.Name</strong><span>@(current.CapturedAt?.ToString("dd.MM.yyyy · HH:mm:ss 'UTC'") ?? "Brak daty wykonania w metadanych")</span></div><button class="icon-button fullscreen-button" aria-label="@(_gallery.IsFullscreen ? "Zamknij pełny ekran" : "Pełny ekran")" @onclick="ToggleFullscreen">@(_gallery.IsFullscreen ? "↙" : "⛶")</button></div>
+                    </div>
+                    <nav class="gallery-navigation" aria-label="Nawigacja materiałów"><button class="button secondary" disabled="@(!_gallery.CanPrevious)" @onclick="Previous">← Poprzedni</button><span class="counter" data-testid="counter"><strong>@_gallery.Position</strong><span>/</span>@_gallery.Items.Count</span><button class="button secondary" disabled="@(!_gallery.CanNext)" @onclick="Next">Następny →</button></nav>
+                    <section class="upcoming"><div class="section-heading"><span class="eyebrow">ZA CHWILĘ</span><span class="muted small">Kolejne materiały</span></div><div class="thumbnail-strip">
+                    @foreach (var item in _gallery.Upcoming)
+                    { var targetIndex = _gallery.Items.ToList().IndexOf(item); <button @key="(item.Id, _loadGeneration)" class="thumbnail" @onclick="() => _gallery.Select(targetIndex)" title="@item.Name"><MediaThumbnail Asset="item" /><span class="thumbnail-kind">@(item.Kind == MediaKind.Video ? "▶" : "▧")</span><span class="thumbnail-caption">@item.Name</span></button> }
+                    </div></section>
+                }
+                else
+                { <div class="empty-state"><div class="empty-symbol">▧</div><h2>@(_gallery.ActiveList == MediaList.Invalid ? "Wszystkie chwile mają swoją datę" : "Twoje wspomnienia czekają")</h2><p>@(_gallery.ActiveList == MediaList.Invalid ? "Materiały bez poprawnej daty pojawią się tutaj." : "Wybierz foldery po lewej i otwórz kolekcję. Ułożymy zdjęcia i filmy chronologicznie.")</p></div> }
+            </main>
+        </div>
+    }
+    @if (_error is not null) { <div class="toast" role="alert"><span>@_error</span><button class="icon-button" aria-label="Zamknij komunikat" @onclick="() => _error = null">×</button>@if (_reauthorize) { @if (Broker.IsTv) { <button class="text-link" @onclick="Reconnect">Połącz ponownie</button> } else { <a href="/auth/login?consent=true">Połącz ponownie</a> } }</div> }
+    @if (_confirmDisconnect)
+    { <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="disconnect-title"><h2 id="disconnect-title">Odłączyć konto Google?</h2><p>Dostęp zostanie cofnięty w przeglądarkach i wszystkich powiązanych telewizorach. Pliki na Drive pozostaną bez zmian.</p><button class="button" @onclick="() => _confirmDisconnect = false">Anuluj</button><button class="button danger" @onclick="() => SignOut(true)">Odłącz wszędzie</button></section></div> }
+    <footer class="app-footer"><span>DIGITALSORTER</span><span>Wspomnienia należą do Ciebie.</span><span class="palette-dots"><i></i><i></i><i></i></span></footer>
+</div>
+
+@code {
+    private readonly GalleryState _gallery = new();
+    private readonly Dictionary<string, SourceFolder> _selected = new(StringComparer.Ordinal);
+    private readonly Stack<string?> _folderStack = new();
+    private IReadOnlyList<SourceFolder> _folders = [];
+    private string? _parent, _error, _folderLink;
+    private bool _initializing = true, _busy, _reauthorize, _confirmDisconnect;
+    private int _loadGeneration;
+    private PairingStarted? _pairing;
+    private string _pairStatus = "Czekam na zatwierdzenie na telefonie…";
+    private CancellationTokenSource? _operation, _pairCancellation;
+    private DotNetObjectReference<Gallery>? _reference;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            await Broker.InitializeAsync();
+            _reference = DotNetObjectReference.Create(this);
+            await Broker.Module.InvokeVoidAsync("bindGallery", _reference);
+            if (Broker.Session.Authenticated) await Browse(null);
+            var error = System.Web.HttpUtility.ParseQueryString(new Uri(Navigation.Uri).Query)["error"];
+            if (error is not null) { _reauthorize = error is "permission" or "consent"; _error = error switch { "permission" => "Dostęp tylko do odczytu Drive jest wymagany do otwarcia kolekcji.", "consent" => "Potwierdź ponownie zgodę na dostęp do Google Drive.", _ => "Logowanie nie zostało zakończone. Spróbuj ponownie." }; }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JSException or DriveException) { _error = "Nie udało się przygotować połączenia. Sprawdź Internet i odśwież stronę."; }
+        _initializing = false; StateHasChanged();
+    }
+    private async Task Browse(string? parent)
+    {
+        try { _folders = await Library.GetFoldersAsync(parent); _parent = parent; }
+        catch (DriveException ex) { Show(ex); }
+    }
+    private async Task OpenFolder(string id) { _folderStack.Push(_parent); await Browse(id); }
+    private async Task Root() { _folderStack.Clear(); await Browse(null); }
+    private async Task Up() { if (_folderStack.TryPop(out var parent)) await Browse(parent); }
+    private void SelectFolder(SourceFolder folder, bool selected) { if (selected) _selected[folder.Id] = folder; else _selected.Remove(folder.Id); }
+    private void AddFolder()
+    {
+        var value = _folderLink?.Trim() ?? "";
+        if (Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            if (uri.Host != "drive.google.com") { _error = "Użyj linku do folderu Google Drive."; return; }
+            value = uri.AbsolutePath.Split('/').LastOrDefault() ?? "";
+        }
+        if (value.Length is < 3 or > 200 || !value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_')) { _error = "Podaj poprawny link lub identyfikator folderu."; return; }
+        _selected.TryAdd(value, new(value, "Folder " + value[..Math.Min(10, value.Length)]));
+        _folderLink = "";
+    }
+    private async Task Load()
+    {
+        _operation?.Cancel(); _operation?.Dispose(); _operation = new(); _busy = true; _error = null;
+        try { _gallery.Load(MediaClassifier.Classify(await Library.ReadAsync(_selected.Keys.ToArray(), _operation.Token))); _loadGeneration++; }
+        catch (OperationCanceledException) { _error = "Odczyt został anulowany."; }
+        catch (DriveException ex) { Show(ex); }
+        finally { _busy = false; }
+    }
+    private void Show(DriveException ex) { _error = ex.Message; _reauthorize = ex.Reason == DriveFailure.Authentication; }
+    private async Task Reconnect() { await SignOut(false); if (!Broker.Session.Authenticated) await StartPairing(); }
+    private async Task StartPairing()
+    {
+        _pairCancellation?.Cancel(); _pairCancellation?.Dispose(); _pairCancellation = new();
+        try { _pairing = await Broker.StartPairingAsync(); _pairStatus = "Czekam na zatwierdzenie na telefonie…"; _ = PollPairing(_pairing, _pairCancellation.Token); }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException) { _error = ex.Message; }
+    }
+    private async Task PollPairing(PairingStarted pair, CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(pair.IntervalSeconds), ct);
+                var status = await Broker.PollAsync(pair, ct);
+                if (status == "approved") { _pairing = null; await Browse(null); await InvokeAsync(StateHasChanged); return; }
+                if (status is "expired" or "consumed" or "invalid" || DateTimeOffset.UtcNow >= pair.ExpiresAt)
+                { _pairStatus = "Kod wygasł. Wygeneruj nowy kod."; await InvokeAsync(StateHasChanged); return; }
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (JSException) { _pairStatus = "Nie można zapisać sesji na telewizorze. Rozpocznij parowanie ponownie."; await InvokeAsync(StateHasChanged); }
+        catch (HttpRequestException) { _error = "Połączenie zostało przerwane. Rozpocznij parowanie ponownie."; await InvokeAsync(StateHasChanged); }
+    }
+    private void Previous() => _gallery.Previous();
+    private void Next() => _gallery.Next();
+    private void SwitchList(MediaList list) => _gallery.SelectList(list);
+    private async Task ToggleFullscreen() { _gallery.ToggleFullscreen(); await Broker.Module.InvokeVoidAsync("fullscreen", _gallery.IsFullscreen); }
+    [JSInvokable] public async Task Key(string key)
+    {
+        if (key == "next") _gallery.Next();
+        if (key == "previous") _gallery.Previous();
+        if (key == "exit") _gallery.ExitFullscreen();
+        await InvokeAsync(StateHasChanged);
+    }
+    private async Task SignOut(bool disconnect)
+    {
+        _operation?.Cancel();
+        try
+        {
+            await Broker.SignOutAsync(disconnect);
+            _gallery.Load(MediaCollection.Empty); _selected.Clear(); _folderStack.Clear(); _folders = [];
+            _parent = null; _error = null; _reauthorize = false; _confirmDisconnect = false;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException) { _error = ex.Message; }
+    }
+    public ValueTask DisposeAsync()
+    {
+        _operation?.Cancel(); _operation?.Dispose(); _pairCancellation?.Cancel(); _pairCancellation?.Dispose(); _reference?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

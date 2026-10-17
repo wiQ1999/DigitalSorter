@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DigitalSorter.Auth/DigitalSorter.Auth.csproj" />
+    <Project Path="src/DigitalSorter.Contracts/DigitalSorter.Contracts.csproj" />
+    <Project Path="src/DigitalSorter.Core/DigitalSorter.Core.csproj" />
+    <Project Path="src/DigitalSorter.Data.GoogleDrive/DigitalSorter.Data.GoogleDrive.csproj" />
+    <Project Path="src/DigitalSorter.Web/DigitalSorter.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DigitalSorter.Core.Tests/DigitalSorter.Core.Tests.csproj" />
+    <Project Path="tests/DigitalSorter.IntegrationTests/DigitalSorter.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

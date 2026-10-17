@@ -1,0 +1,42 @@
+services:
+  app:
+    image: digitalsorter:${IMAGE_TAG:-latest}
+    build: .
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      AllowedHosts: ${APP_DOMAIN:?Set APP_DOMAIN}
+      Broker__PublicOrigin: https://${APP_DOMAIN}
+      Broker__KnownProxies__0: 172.30.50.2
+      Broker__TokenEncryptionKey: ${TOKEN_ENCRYPTION_KEY:?Set TOKEN_ENCRYPTION_KEY}
+      Google__ClientId: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID}
+      Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET}
+    volumes:
+      - broker-data:/app/data
+    networks:
+      internal:
+        ipv4_address: 172.30.50.3
+  https:
+    image: caddy:2.10.2
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      internal:
+        ipv4_address: 172.30.50.2
+volumes:
+  broker-data:
+  caddy-data:
+  caddy-config:
+networks:
+  internal:
+    ipam:
+      config:
+        - subnet: 172.30.50.0/24

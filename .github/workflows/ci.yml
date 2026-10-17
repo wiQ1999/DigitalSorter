@@ -1,0 +1,123 @@
+name: Validate
+on:
+  push:
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  web-and-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chrome
+      - run: scripts/verify.sh
+      - run: dotnet publish src/DigitalSorter.Auth -c Release -o artifacts/web -p:RestoreLockedMode=true
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: web-and-backend
+          path: artifacts/web
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: test-results
+          path: test-results
+  android-tv:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Select the daily native build cache
+        id: native-day
+        shell: pwsh
+        run: Add-Content $env:GITHUB_OUTPUT "date=$([DateTime]::UtcNow.ToString('yyyy-MM-dd'))"
+      - uses: actions/cache@v6.1.0
+        id: native-cache
+        with:
+          path: |
+            src/DigitalSorter.AndroidTV/bin/Release/net10.0-android/android-arm64/*Signed.apk
+            test-results/native-fixture
+          key: native-tv-v1-${{ runner.os }}-${{ steps.native-day.outputs.date }}-${{ hashFiles('global.json', 'Directory.Build.props', 'src/DigitalSorter.AndroidTV/**', 'tests/native/*.xml', 'tests/native/create-certificate.ps1') }}
+      - uses: actions/setup-dotnet@v6.0.0
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-java@v6.1.0
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          distribution: microsoft
+          java-version: '21'
+      - run: dotnet workload install maui-android --skip-manifest-update
+        if: steps.native-cache.outputs.cache-hit != 'true'
+      - run: dotnet build src/DigitalSorter.AndroidTV -c Release -p:RuntimeIdentifier=android-arm64 -p:RestoreLockedMode=true -warnaserror
+        if: steps.native-cache.outputs.cache-hit != 'true'
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: android-tv-test-apk
+          path: src/DigitalSorter.AndroidTV/bin/Release/net10.0-android/android-arm64/*Signed.apk
+      - name: Create temporary CA for controlled native tests
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: tests/native/create-certificate.ps1
+      - name: Build standalone x64 APK with the temporary test CA
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $testCa = (Resolve-Path test-results/native-fixture/test-ca.pem).Path
+          dotnet build src/DigitalSorter.AndroidTV -c Debug -p:RuntimeIdentifier=android-x64 -p:RestoreLockedMode=true "-p:DigitalSorterTestCertificate=$testCa" -warnaserror
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item src/DigitalSorter.AndroidTV/bin/Debug/net10.0-android/android-x64/*Signed.apk test-results/native-fixture/tv-test.apk
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: native-tv-fixture
+          path: test-results/native-fixture
+          retention-days: 1
+  android-tv-runtime:
+    needs: android-tv
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: microsoft
+          java-version: '21'
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: native-tv-fixture
+          path: test-results/native-fixture
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chrome
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -c /dev/kvm
+      - name: Boot Android TV and run the native scenario
+        run: scripts/run-tv-emulator.sh
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: native-tv-results
+          path: |
+            test-results/native-*.png
+            test-results/native-*.json
+            test-results/native-*.txt
+            test-results/native-*.log
+          retention-days: 7

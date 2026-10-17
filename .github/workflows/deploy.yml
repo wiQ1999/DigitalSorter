@@ -1,0 +1,48 @@
+name: Deploy
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+  deploy:
+    needs: validate
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Build combined frontend and backend image
+        run: |
+          docker build -t digitalsorter:${{ github.sha }} .
+          docker save digitalsorter:${{ github.sha }} | gzip > image.tar.gz
+          tar -czf release.tar.gz image.tar.gz compose.yaml deploy/Caddyfile
+      - name: Install verified SSH configuration
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST_KEYS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_KEY"
+          test -n "$DEPLOY_HOST_KEYS"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_HOST_KEYS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+      - name: Deploy on configured Docker host
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" 'mkdir -p /opt/digitalsorter'
+          scp -i ~/.ssh/deploy_key release.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/opt/digitalsorter/release.tar.gz"
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "bash -s -- $IMAGE_TAG" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/digitalsorter
+          tar -xzf release.tar.gz
+          gzip -dc image.tar.gz | docker load
+          IMAGE_TAG="$1" docker compose up -d --no-build
+          rm -f image.tar.gz release.tar.gz
+          REMOTE

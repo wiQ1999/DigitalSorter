@@ -1,0 +1,33 @@
+@implements IAsyncDisposable
+@inject BrokerClient Broker
+
+<div class="media-stage" @ref="_element" tabindex="0" aria-label="Aktualny materiał" data-testid="media-stage">
+    <div class="ambient" aria-hidden="true"></div>
+    <div class="media-surface"></div>
+    @if (_error is not null)
+    {
+        <div class="media-error" role="status"><span>◇</span><strong>Nie można wyświetlić materiału</strong><p>@_error</p></div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public MediaAsset Asset { get; set; } = default!;
+    private ElementReference _element;
+    private IJSObjectReference? _player;
+    private DotNetObjectReference<MediaPlayer>? _reference;
+    private string? _error;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!Asset.IsAvailable) { _error = "Brak dostępu do pliku źródłowego."; StateHasChanged(); return; }
+        _reference = DotNetObjectReference.Create(this);
+        try { _player = await Broker.Module.InvokeAsync<IJSObjectReference>("mountMedia", _element, Asset.Id, Asset.Name, Asset.MimeType, Asset.Kind == MediaKind.Video, _reference); }
+        catch (JSException) { _error = "Przeglądarka nie obsługuje tego materiału lub plik jest niedostępny."; StateHasChanged(); }
+    }
+    [JSInvokable] public Task MediaError(string message) { _error = message; return InvokeAsync(StateHasChanged); }
+    public async ValueTask DisposeAsync()
+    {
+        if (_player is not null) { try { await _player.InvokeVoidAsync("dispose"); await _player.DisposeAsync(); } catch (JSDisconnectedException) { } }
+        _reference?.Dispose();
+    }
+}

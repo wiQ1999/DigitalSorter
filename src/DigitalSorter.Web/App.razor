@@ -1,0 +1,10 @@
+@inject NavigationManager Navigation
+
+@if (new Uri(Navigation.Uri).AbsolutePath == "/pair")
+{
+    <PairPage />
+}
+else
+{
+    <Gallery />
+}
