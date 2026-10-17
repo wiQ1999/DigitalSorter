@@ -1166,8 +1166,11 @@ input::placeholder {
     gap: 15px;
   }
   .app-header {
-    padding: 0 20px;
-    height: 72px;
+    padding: 12px 20px;
+    height: auto;
+    min-height: 72px;
+    flex-wrap: wrap;
+    gap: 8px 12px;
   }
   .brand {
     font-size: 1.3rem;
@@ -1177,6 +1180,7 @@ input::placeholder {
   }
   .account-actions {
     font-size: 0.7rem;
+    margin-left: auto;
   }
   .workspace {
     display: flex;

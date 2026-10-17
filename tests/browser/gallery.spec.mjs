@@ -280,6 +280,12 @@ test(
       const counts = [];
       for (const width of [1920, 1280, 800, 390, 320, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
+        const fallbackFont =
+          width === 320
+            ? await page.addStyleTag({
+                content: ':root { font-family: "DejaVu Sans", sans-serif; }',
+              })
+            : null;
         await thumbnailsFit(page, 8);
         const titles = await page
           .locator(".thumbnail")
@@ -289,6 +295,7 @@ test(
         const layout = await page.evaluate(() => ({
           width: innerWidth,
           scrollWidth: document.documentElement.scrollWidth,
+          font: getComputedStyle(document.documentElement).fontFamily,
           outside: [...document.querySelectorAll("body *")]
             .filter(
               (element) => element.getBoundingClientRect().right > innerWidth,
@@ -305,6 +312,13 @@ test(
             fullPage: true,
           });
         assert.ok(layout.scrollWidth <= layout.width, JSON.stringify(layout));
+        if (fallbackFont) {
+          await page.screenshot({
+            path: "test-results/web-narrow-fallback-font.png",
+            fullPage: true,
+          });
+          await fallbackFont.evaluate((style) => style.remove());
+        }
       }
       assert.ok(
         counts[0] > 5 && counts[0] > counts[1] && counts[1] > counts[4],
