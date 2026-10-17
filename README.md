@@ -9,6 +9,8 @@ Instrukcje krok po kroku:
 - [Lokalne testy i wdrożenie produkcyjne przez HTTPS, certyfikaty](docs/DEPLOYMENT.md).
 - [Instalacja Android TV przez USB i publikacja w Google Play](docs/ANDROID_TV.md).
 
+Zadania i uwagi z testów: [backlog](docs/BACKLOG.md).
+
 Wymagane: SDK z `global.json`, Node.js 22+, HTTPS. Dla TV: workload `maui-android`, JDK 21, Android SDK 36.
 
 Lokalne demo bez konta Google: przygotuj certyfikat według [instrukcji](docs/DEPLOYMENT.md), wykonaj `npm ci --ignore-scripts` i `bash scripts/run-local-demo.sh`. Ten sam backend może obsługiwać TV i telefon w LAN przez HTTPS.
