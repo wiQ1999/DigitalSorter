@@ -65,3 +65,14 @@ Podczas podłączania własnego Google Drive użytkownik musiał dodać konto w 
 - Wyjaśniono wymagania dla obecnego trybu testowego oraz docelowego sposobu udostępnienia aplikacji.
 - Instrukcja jasno wskazuje, co wykonuje administrator aplikacji, a co użytkownik łączący swój Dysk.
 - Jeżeli dodawanie każdego konta w panelu Google wynika z trybu testowego, opisano sposób obsługi kolejnych użytkowników w docelowym wariancie.
+
+## BL-006 — Przyspieszenie wczytywania zdjęć
+
+Podczas przeglądania rzeczywistych materiałów zdjęcia wczytują się zbyt wolno. Należy ustalić przyczynę opóźnień i skrócić czas od wybrania zdjęcia do jego wyświetlenia, także przy przechodzeniu do kolejnego materiału.
+
+**Kryteria akceptacji:**
+
+- Zmierzono czas wczytywania na reprezentatywnych zdjęciach i ustalono, na którym etapie powstają opóźnienia.
+- Po poprawce czas wyświetlenia zdjęć jest krótszy, co potwierdza porównanie przed i po zmianie w tych samych warunkach.
+- Użytkownik widzi informację o trwającym ładowaniu do momentu wyświetlenia zdjęcia lub błędu.
+- Optymalizacja zachowuje poprawną kolejność materiałów i nie wprowadza trwałego zapisywania zdjęć ani tokenów w pamięci podręcznej.
