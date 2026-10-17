@@ -5,12 +5,12 @@ Web i Android TV używają HTTPS również w testach. Wymagania hostingu: [archi
 Polecenia: Bash na Linux/macOS lub WSL, z katalogu repozytorium. Wymagane: Git, SDK z `global.json`, Node.js 22+ i OpenSSL; do certyfikatu TV także Certbot oraz własna domena z możliwością edycji DNS.
 
 ```bash
-git clone --branch feature/full-digital-sorter https://github.com/wiQ1999/DigitalSorter.git
+git clone --branch master https://github.com/wiQ1999/DigitalSorter.git
 cd DigitalSorter
 npm ci --ignore-scripts
 ```
 
-Po scaleniu brancha wybieraj wydany tag lub zatwierdzony commit.
+Do wdrożenia wybieraj wydany tag lub zatwierdzony commit.
 
 ## 1. Certyfikat do testów tylko na laptopie
 
