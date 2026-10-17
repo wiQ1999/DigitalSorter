@@ -286,12 +286,25 @@ test(
           .evaluateAll((buttons) => buttons.map((button) => button.title));
         counts.push(titles.length);
         assert.deepEqual(titles, upcoming.slice(0, titles.length));
-        assert.equal(
-          await page.evaluate(
-            () => document.documentElement.scrollWidth <= innerWidth,
-          ),
-          true,
-        );
+        const layout = await page.evaluate(() => ({
+          width: innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          outside: [...document.querySelectorAll("body *")]
+            .filter(
+              (element) => element.getBoundingClientRect().right > innerWidth,
+            )
+            .map((element) => ({
+              element: element.tagName + "." + element.className,
+              right: element.getBoundingClientRect().right,
+            }))
+            .slice(0, 20),
+        }));
+        if (layout.scrollWidth > layout.width)
+          await page.screenshot({
+            path: `test-results/responsive-overflow-${width}.png`,
+            fullPage: true,
+          });
+        assert.ok(layout.scrollWidth <= layout.width, JSON.stringify(layout));
       }
       assert.ok(
         counts[0] > 5 && counts[0] > counts[1] && counts[1] > counts[4],
