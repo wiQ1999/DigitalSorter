@@ -55,6 +55,7 @@
 - Tło odtwarzacza próbkuje kolory z brzegów bieżącej klatki zdjęcia lub filmu; pełny ekran ma czarne tło.
 - Adapter przeglądarkowy w `DigitalSorter.Data.GoogleDrive` strumieniuje żądania Range z nagłówkiem OAuth przez service worker. Nie zapisuje plików ani tokenów w cache; HEIC/HEIF dekoduje klient.
 - Gdy miniatura Drive jest niedostępna lub blokowana przez CORS, klient tworzy podgląd z oryginalnego zdjęcia albo klatki filmu; bez pośrednictwa backendu.
+- Źródło biblioteki raportuje `MediaReadProgress` przez `IProgress`: wyszukiwanie bez znanej całości, następnie odczyt unikalnych obsługiwanych materiałów. `ResizeObserver` dopasowuje liczbę miniatur do szerokości paska; Core zwraca żądaną liczbę kolejnych pozycji.
 - Sesja webowa używa cookie `HttpOnly`, `Secure`, z określoną ważnością, polityką `SameSite` i ochroną CSRF.
 
 ## Hosting i wdrożenie

@@ -90,8 +90,9 @@ bash scripts/run-local-demo.sh
 2. Wybierz „Połącz Google Drive” → „Zatwierdź dostęp testowy”.
 3. Wybierz folder „Podróże i wspomnienia” → „Otwórz kolekcję”.
 4. Dla wariantu LAN zainstaluj APK według [instrukcji TV](ANDROID_TV.md#4-pierwsze-uruchomienie-i-parowanie) i wpisz ten sam adres. Na telefonie również zatwierdź kontrolowany OAuth.
-5. Sprawdź zdjęcia, filmy, pilot, pełny ekran i ponowne uruchomienie TV. Backend pozostaw uruchomiony podczas restartu TV.
-6. Zakończ backend przez `Ctrl+C`. Skrypt usuwa dane tymczasowe; kolejne uruchomienie wymaga nowego parowania.
+5. Sprawdź postęp odczytu, anulowanie i ponowne otwarcie kolekcji. Zmień szerokość okna: liczba miniatur ma odpowiadać miejscu na pasku, bez przepełnienia.
+6. Sprawdź zdjęcia, filmy, pilot, pełny ekran i ponowne uruchomienie TV. Backend pozostaw uruchomiony podczas restartu TV.
+7. Zakończ backend przez `Ctrl+C`. Skrypt usuwa dane tymczasowe; kolejne uruchomienie wymaga nowego parowania.
 
 Demo używa syntetycznych danych, bez sekretów Google. Host testowy nie wchodzi do produkcji. Sprawdzenie: `curl --fail "$TEST_ORIGIN/health"`; przy certyfikacie .NET dodaj `--cacert "$tls_dir/localhost.crt"`.
 

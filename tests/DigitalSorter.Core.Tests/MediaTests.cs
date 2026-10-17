@@ -108,7 +108,7 @@ public sealed class GalleryTests
         var state = new GalleryState();
         state.Previous(); state.Next(); state.Select(-1); state.Select(1); state.ToggleFullscreen();
         Assert.Null(state.Current); Assert.Equal(0, state.Position); Assert.False(state.CanPrevious); Assert.False(state.CanNext);
-        Assert.False(state.IsFullscreen); Assert.Empty(state.Upcoming);
+        Assert.False(state.IsFullscreen); Assert.Empty(state.GetUpcoming(5));
     }
     [Fact]
     public void NavigationStopsAtBothBoundaries()
@@ -118,12 +118,14 @@ public sealed class GalleryTests
         state.Next(); state.Next(); Assert.Equal(2, state.Position); Assert.False(state.CanNext);
         state.Previous(); Assert.Equal(1, state.Position); Assert.False(state.CanPrevious);
     }
-    [Fact]
-    public void UpcomingContainsOnlyNextFiveItems()
+    [Theory]
+    [InlineData(-1, 0)] [InlineData(0, 0)] [InlineData(1, 1)] [InlineData(3, 3)] [InlineData(6, 6)] [InlineData(20, 7)]
+    public void UpcomingUsesRequestedCapacityAndNeverIncludesCurrentOrMissingItems(int capacity, int expected)
     {
         var state = new GalleryState(); state.Load(Collection());
-        Assert.Equal(["1", "2", "3", "4", "5"], state.Upcoming.Select(x => x.Id));
-        state.Select(7); Assert.Empty(state.Upcoming);
+        Assert.Equal(Enumerable.Range(1, expected).Select(x => x.ToString()), state.GetUpcoming(capacity).Select(x => x.Id));
+        state.Select(6); Assert.Equal(capacity > 0 ? new[] { "7" } : [], state.GetUpcoming(capacity).Select(x => x.Id));
+        state.Select(7); Assert.Empty(state.GetUpcoming(capacity));
     }
     [Fact]
     public void SelectionIgnoresInvalidIndexes()

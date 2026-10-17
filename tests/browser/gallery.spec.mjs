@@ -3,6 +3,12 @@ import assert from "node:assert/strict";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { X509Certificate, createHash } from "node:crypto";
 import { chromium } from "playwright";
+import {
+  pauseRequest,
+  thumbnailsFit,
+  collectionRequest,
+  metadataRequest,
+} from "./ui-helpers.mjs";
 
 const origin = process.env.TEST_ORIGIN ?? "https://localhost:7443";
 const certificate = new X509Certificate(
@@ -116,6 +122,219 @@ async function checked(name, action) {
 }
 
 test(
+  "Web: metadata progress has discovery, known totals and completion",
+  { timeout: 90000 },
+  async () => {
+    await checked("metadata-progress-completion", async (page) => {
+      await login(page);
+      const discover = await pauseRequest(page, collectionRequest);
+      const metadata = await pauseRequest(page, metadataRequest);
+      try {
+        await page.getByRole("checkbox").first().check();
+        await page.getByRole("button", { name: "Otwórz kolekcję" }).click();
+        await page.getByText("Wyszukuję materiały…", { exact: true }).waitFor();
+        assert.equal(
+          await page
+            .locator(".metadata-progress progress")
+            .getAttribute("value"),
+          null,
+        );
+        await discover();
+        await page
+          .getByText("Odczytano 8 z 10 materiałów.", { exact: true })
+          .waitFor();
+        assert.equal(
+          await page.locator(".metadata-progress progress").getAttribute("max"),
+          "10",
+        );
+        assert.equal(
+          await page
+            .locator(".metadata-progress progress")
+            .getAttribute("value"),
+          "8",
+        );
+        await page.screenshot({
+          path: "test-results/metadata-progress.png",
+          fullPage: true,
+        });
+        await metadata();
+        await page
+          .getByTestId("metadata-progress")
+          .waitFor({ state: "hidden" });
+        await page
+          .getByText("Odczyt zakończony: 10 materiałów.", { exact: true })
+          .waitFor();
+        await imageReady(page);
+      } finally {
+        await discover(true);
+        await metadata(true);
+      }
+    });
+  },
+);
+
+test(
+  "Web: cancellation ends metadata progress in either phase and retry works",
+  { timeout: 90000 },
+  async () => {
+    await checked("metadata-progress-cancellation", async (page) => {
+      await login(page);
+      await load(page);
+      for (const match of [collectionRequest, metadataRequest]) {
+        const resume = await pauseRequest(page, match);
+        try {
+          await page.getByRole("button", { name: "Otwórz kolekcję" }).click();
+          await (
+            match === collectionRequest
+              ? page.getByText("Wyszukuję materiały…", { exact: true })
+              : page.getByText("Odczytano 8 z 10 materiałów.", { exact: true })
+          ).waitFor();
+          await page.getByRole("button", { name: "Anuluj odczyt" }).click();
+          await page
+            .getByTestId("metadata-progress")
+            .waitFor({ state: "hidden" });
+          await page
+            .getByRole("alert")
+            .getByText("Odczyt został anulowany.", { exact: true })
+            .waitFor();
+          assert.match(
+            await page.getByTestId("counter").innerText(),
+            /1\s*\/\s*9/,
+          );
+          assert.equal(
+            await page
+              .getByRole("button", { name: "Otwórz kolekcję" })
+              .isEnabled(),
+            true,
+          );
+        } finally {
+          await resume(true);
+        }
+      }
+      await page.getByRole("button", { name: "Otwórz kolekcję" }).click();
+      await page
+        .getByText("Odczyt zakończony: 10 materiałów.", { exact: true })
+        .waitFor();
+      assert.equal(await page.getByTestId("metadata-progress").count(), 0);
+    });
+  },
+);
+
+test(
+  "Web: metadata errors end progress and preserve the previous collection",
+  { timeout: 90000 },
+  async () => {
+    await checked("metadata-progress-error", async (page) => {
+      await login(page);
+      await load(page);
+      await page.route(metadataRequest, (route) =>
+        route.fulfill({ status: 503, body: "Controlled metadata failure" }),
+      );
+      await page.getByRole("button", { name: "Otwórz kolekcję" }).click();
+      await page
+        .getByRole("alert")
+        .getByText(
+          "Nie udało się połączyć z Google Drive. Sprawdź połączenie i spróbuj ponownie.",
+          { exact: true },
+        )
+        .waitFor();
+      assert.equal(await page.getByTestId("metadata-progress").count(), 0);
+      assert.equal(
+        await page.getByRole("button", { name: "Otwórz kolekcję" }).isEnabled(),
+        true,
+      );
+      assert.match(await page.getByTestId("counter").innerText(), /1\s*\/\s*9/);
+      assert.equal(await page.locator(".load-status").count(), 0);
+    });
+  },
+);
+
+test(
+  "Web: wider folder panel and previews fit resized desktop and mobile layouts",
+  { timeout: 120000 },
+  async () => {
+    await checked("responsive-folders-and-previews", async (page) => {
+      await login(page);
+      await load(page);
+      const sidebar = await page.locator(".sidebar").boundingBox();
+      const viewer = await page.getByTestId("viewer").boundingBox();
+      assert.ok(sidebar.width >= 320 && sidebar.width <= 380);
+      assert.ok(viewer.width >= 700);
+      assert.equal(
+        await page
+          .locator(".folder-row label > span:last-child")
+          .first()
+          .evaluate((label) => label.scrollWidth <= label.clientWidth),
+        true,
+      );
+      const upcoming = [
+        "Wybrzeże.png",
+        "Leśna ścieżka.webp",
+        "Zdjęcie z telefonu.heic",
+        "Drugie zdjęcie.heif",
+        "Zachód słońca.mp4",
+        "Chwila nad wodą.webm",
+        "Spacer.mov",
+        "Niedostępne zdjęcie.jpg",
+      ];
+      const counts = [];
+      for (const width of [1920, 1280, 800, 390, 320, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await thumbnailsFit(page, 8);
+        const titles = await page
+          .locator(".thumbnail")
+          .evaluateAll((buttons) => buttons.map((button) => button.title));
+        counts.push(titles.length);
+        assert.deepEqual(titles, upcoming.slice(0, titles.length));
+        assert.equal(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+          true,
+        );
+      }
+      assert.ok(
+        counts[0] > 5 && counts[0] > counts[1] && counts[1] > counts[4],
+      );
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await thumbnailsFit(page, 8);
+      assert.equal(
+        await page.getByRole("img", { name: "Podgląd niedostępny" }).count(),
+        1,
+      );
+      await page.screenshot({
+        path: "test-results/desktop-responsive-previews.png",
+        fullPage: true,
+      });
+      await page.locator(".thumbnail").last().click();
+      await page.waitForFunction(() =>
+        document
+          .querySelector('[data-testid="counter"]')
+          .innerText.trim()
+          .startsWith("9"),
+      );
+      await thumbnailsFit(page, 0);
+      await page
+        .getByRole("button", { name: "← Poprzedni", exact: true })
+        .click();
+      await thumbnailsFit(page, 1);
+      assert.deepEqual(
+        await page
+          .locator(".thumbnail")
+          .evaluateAll((buttons) => buttons.map((button) => button.title)),
+        ["Niedostępne zdjęcie.jpg"],
+      );
+      await page.getByRole("tab", { name: /Bez poprawnej daty/ }).click();
+      await thumbnailsFit(page, 0);
+      await page
+        .getByRole("tab", { name: "Chronologicznie", exact: true })
+        .click();
+      await thumbnailsFit(page, 8);
+    });
+  },
+);
+
+test(
   "Web: OAuth, source selection, chronological gallery and edge-derived ambient colors",
   { timeout: 120000 },
   async () => {
@@ -186,7 +405,7 @@ test(
         await page.waitForFunction(() => {
           const images = [...document.querySelectorAll(".thumbnail img")];
           return (
-            images.length === 5 &&
+            images.length > 0 &&
             images.every((image) => image.complete && image.naturalWidth > 0)
           );
         });
@@ -438,12 +657,32 @@ test(
       assert.equal(tv.storage.get("session")?.length, 64);
       await tvPage.reload();
       await tvPage.getByRole("heading", { name: "Twoje źródła" }).waitFor();
-      await load(tvPage);
+      await tvPage.setViewportSize({ width: 960, height: 540 });
+      const resume = await pauseRequest(tvPage, metadataRequest);
+      try {
+        await tvPage.getByRole("checkbox").first().check();
+        await tvPage.getByRole("button", { name: "Otwórz kolekcję" }).click();
+        await tvPage
+          .getByText("Odczytano 8 z 10 materiałów.", { exact: true })
+          .waitFor();
+        await tvPage.waitForFunction(() => {
+          const bounds = document
+            .querySelector(".metadata-progress")
+            .getBoundingClientRect();
+          return bounds.top >= 0 && bounds.bottom <= innerHeight;
+        });
+        await tvPage.screenshot({ path: "test-results/tv-progress.png" });
+      } finally {
+        await resume();
+      }
+      await tvPage.getByTestId("counter").waitFor();
+      await imageReady(tvPage);
       for (const viewport of [
         { width: 1920, height: 1080 },
         { width: 960, height: 540 },
       ]) {
         await tvPage.setViewportSize(viewport);
+        await thumbnailsFit(tvPage, 8);
         assert.equal(
           await tvPage.evaluate(() =>
             [".media-stage", ".counter", ".thumbnail-strip"].every(

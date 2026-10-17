@@ -29,6 +29,7 @@
 
 ## Przetwarzanie materiałów
 
+- Odczyt pokazuje wyszukiwanie materiałów, następnie liczbę przetworzonych względem całości; można go anulować. Zakończenie i błędy są sygnalizowane.
 - Materiały z poprawną datą i czasem wykonania są sortowane od najstarszego do najnowszego i umieszczane na liście głównej.
 - Data przesłania, utworzenia lub modyfikacji pliku nie zastępuje daty wykonania z metadanych.
 - Materiały bez poprawnej daty i czasu są dalej przetwarzane, oznaczane jako niepoprawne i umieszczane na osobnej liście.
@@ -38,7 +39,8 @@
 
 ## Widok aplikacji
 
-- Widok zawiera aktualny materiał oraz miniatury kilku następnych.
+- Widok zawiera aktualny materiał i tyle miniatur kolejnych materiałów, ile mieści się w szerokości paska; liczba reaguje na zmianę rozmiaru okna.
+- Panel folderów na komputerze jest szerszy; telefon i TV zachowują własne dopasowanie układu.
 - Użytkownik może przechodzić do poprzedniego i następnego materiału.
 - Licznik pokazuje numer aktualnego materiału i liczbę materiałów na bieżącej liście.
 - Aktywny materiał można wyświetlić w trybie pełnoekranowym.

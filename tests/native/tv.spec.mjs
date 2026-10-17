@@ -1,4 +1,9 @@
 import test from "node:test";
+import {
+  pauseRequest,
+  thumbnailsFit,
+  metadataRequest,
+} from "../browser/ui-helpers.mjs";
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { X509Certificate, createHash } from "node:crypto";
@@ -140,8 +145,25 @@ test(
         if (!response.ok)
           throw new Error("Controlled Drive configuration failed");
       });
-      await page.getByRole("checkbox").first().check();
-      await page.getByRole("button", { name: "Otwórz kolekcję" }).click();
+      const resume = await pauseRequest(page, metadataRequest);
+      try {
+        await page.getByRole("checkbox").first().check();
+        await page.getByRole("button", { name: "Otwórz kolekcję" }).click();
+        await page
+          .getByText("Odczytano 8 z 10 materiałów.", { exact: true })
+          .waitFor();
+        await page.waitForFunction(() => {
+          const bounds = document
+            .querySelector(".metadata-progress")
+            .getBoundingClientRect();
+          return bounds.top >= 0 && bounds.bottom <= innerHeight;
+        });
+        await device.screenshot({
+          path: "test-results/native-tv-progress.png",
+        });
+      } finally {
+        await resume();
+      }
       await page.waitForFunction(
         () => document.querySelector(".media-surface img")?.naturalWidth > 0,
       );
@@ -149,13 +171,14 @@ test(
       await page.waitForFunction(() => {
         const images = [...document.querySelectorAll(".thumbnail img")];
         return (
-          images.length === 5 &&
+          images.length > 0 &&
           images.every((image) => image.complete && image.naturalWidth > 0)
         );
       });
       console.log(
         "Native photo and video previews work without Drive thumbnail links",
       );
+      await thumbnailsFit(page, 8);
       assert.equal(
         await page.evaluate(() =>
           [".media-stage", ".counter", ".thumbnail-strip"].every((selector) => {

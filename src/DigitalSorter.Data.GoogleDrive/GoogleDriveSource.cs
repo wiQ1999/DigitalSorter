@@ -41,17 +41,22 @@ public sealed class GoogleDriveSource(HttpClient http, IAccessTokenProvider toke
         return files.Select(x => new SourceFolder(x.GetProperty("id").GetString()!, x.GetProperty("name").GetString()!)).ToArray();
     }
 
-    public async Task<IReadOnlyList<MediaAsset>> ReadAsync(IEnumerable<string> folderIds, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MediaAsset>> ReadAsync(IEnumerable<string> folderIds, CancellationToken cancellationToken = default,
+        IProgress<MediaReadProgress>? progress = null)
     {
-        var result = new List<MediaAsset>();
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report(new(0, null));
+        var candidates = new List<(MediaAsset Asset, long? Size)>();
         var pending = new Queue<string>(folderIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.Ordinal));
         var visited = new HashSet<string>(StringComparer.Ordinal);
         var seenFiles = new HashSet<string>(StringComparer.Ordinal);
         while (pending.TryDequeue(out var folder))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!visited.Add(folder)) continue;
             foreach (var file in await ListAsync($"trashed = false and '{Escape(folder)}' in parents", cancellationToken))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var id = file.GetProperty("id").GetString()!;
                 var mime = file.GetProperty("mimeType").GetString()!;
                 if (mime == FolderMime) { pending.Enqueue(id); continue; }
@@ -61,14 +66,26 @@ public sealed class GoogleDriveSource(HttpClient http, IAccessTokenProvider toke
                     !capabilities.TryGetProperty("canDownload", out var canDownload) || canDownload.GetBoolean();
                 DateTimeOffset? captured = null;
                 if (file.TryGetProperty("imageMediaMetadata", out var image) && image.TryGetProperty("time", out var time)) captured = CaptureDate.Parse(time.GetString());
-                if (captured is null && available)
-                {
-                    var size = file.TryGetProperty("size", out var sizeJson) && long.TryParse(sizeJson.GetString(), out var parsedSize) ? parsedSize : (long?)null;
-                    try { captured = await CaptureMetadata.ReadAsync(name, async (offset, length, ct) => await ReadRangeAsync(id, offset, length, ct), cancellationToken, size); }
-                    catch (DriveException ex) when (ex.Reason is DriveFailure.Permission or DriveFailure.Missing) { available = false; }
-                }
-                result.Add(new(id, name, mime, kind, captured, folder, available));
+                var size = file.TryGetProperty("size", out var sizeJson) && long.TryParse(sizeJson.GetString(), out var parsedSize) ? parsedSize : (long?)null;
+                candidates.Add((new(id, name, mime, kind, captured, folder, available), size));
             }
+        }
+        progress?.Report(new(0, candidates.Count));
+        var result = new List<MediaAsset>(candidates.Count);
+        foreach (var (candidate, size) in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var asset = candidate;
+            if (asset.CapturedAt is null && asset.IsAvailable)
+            {
+                try { asset = asset with { CapturedAt = await CaptureMetadata.ReadAsync(asset.Name,
+                    (offset, length, ct) => ReadRangeAsync(asset.Id, offset, length, ct), cancellationToken, size) }; }
+                catch (DriveException ex) when (ex.Reason is DriveFailure.Permission or DriveFailure.Missing)
+                { asset = asset with { IsAvailable = false }; }
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            result.Add(asset);
+            progress?.Report(new(result.Count, candidates.Count));
         }
         return result;
     }

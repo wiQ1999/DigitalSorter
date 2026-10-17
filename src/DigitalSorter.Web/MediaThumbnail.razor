@@ -1,7 +1,10 @@
 @implements IAsyncDisposable
 @inject BrokerClient Broker
 
-<img @ref="_image" loading="lazy" src="@("/drive-content/" + Uri.EscapeDataString(Asset.Id) + "?thumbnail=1")" alt="" @onerror="Fallback" />
+@if (Asset.IsAvailable)
+{ <img @ref="_image" loading="lazy" src="@("/drive-content/" + Uri.EscapeDataString(Asset.Id) + "?thumbnail=1")" alt="" @onerror="Fallback" /> }
+else
+{ <span class="thumbnail-unavailable" role="img" aria-label="Podgląd niedostępny">⊘</span> }
 
 @code {
     [Parameter, EditorRequired] public MediaAsset Asset { get; set; } = default!;

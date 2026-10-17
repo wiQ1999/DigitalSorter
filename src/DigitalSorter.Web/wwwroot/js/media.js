@@ -96,6 +96,40 @@ export async function initialize(reference, tv, filesEndpoint) {
 export function bindGallery(reference) {
   gallery = reference;
 }
+export function unbindGallery() {
+  gallery = null;
+}
+export function showReadProgress() {
+  document
+    .querySelector(".metadata-progress")
+    ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+export function observeThumbnails(strip, reference) {
+  let previous = -1;
+  let disposed = false;
+  const observer = new ResizeObserver(([entry]) => {
+    const style = getComputedStyle(strip);
+    const minimum = parseFloat(style.getPropertyValue("--thumbnail-min-width"));
+    const gap = parseFloat(style.columnGap) || 0;
+    const width = entry.contentRect.width;
+    const capacity =
+      width > 0 ? Math.max(1, Math.floor((width + gap) / (minimum + gap))) : 0;
+    if (capacity === previous) return;
+    previous = capacity;
+    reference
+      .invokeMethodAsync("SetPreviewCapacity", capacity)
+      .catch((error) => {
+        if (!disposed) console.error(error);
+      });
+  });
+  observer.observe(strip);
+  return {
+    dispose() {
+      disposed = true;
+      observer.disconnect();
+    },
+  };
+}
 export async function fullscreen(enabled) {
   full = enabled;
   if (enabled && !document.fullscreenElement) {

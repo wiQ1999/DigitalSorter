@@ -30,6 +30,11 @@ public sealed class ControlledToken : IAccessTokenProvider
 
 public sealed class DriveTests
 {
+    private sealed class ProgressLog(Action<MediaReadProgress>? report = null) : IProgress<MediaReadProgress>
+    {
+        public List<MediaReadProgress> Values { get; } = [];
+        public void Report(MediaReadProgress value) { Values.Add(value); report?.Invoke(value); }
+    }
     private static object File(string id, string name, string? captured, string mime = "image/jpeg", bool available = true) =>
         new { id, name, mimeType = mime, imageMediaMetadata = new { time = captured }, capabilities = new { canDownload = available }, createdTime = "2026-01-01T00:00:00Z", modifiedTime = "2026-02-01T00:00:00Z" };
 
@@ -47,11 +52,61 @@ public sealed class DriveTests
             return ControlledDrive.Json(new { nextPageToken = "second", files = new[] { File("same", "shared.jpg", "2020-01-01T00:00:00Z"), File("nested", "Subfolder", null, "application/vnd.google-apps.folder"), File("other", "notes.txt", null) } });
         });
         var source = new GoogleDriveSource(new(handler), new ControlledToken());
-        var assets = await source.ReadAsync(["main", "main", "nested"]);
+        var progress = new ProgressLog();
+        var assets = await source.ReadAsync(["main", "main", "nested"], progress: progress);
         Assert.Equal(3, assets.Count);
         Assert.Single(assets, x => x.Id == "same");
         Assert.Equal(3, handler.Requests.Count);
         Assert.DoesNotContain(assets, x => x.Name == "notes.txt");
+        Assert.Equal([new(0, null), new(0, 3), new(1, 3), new(2, 3), new MediaReadProgress(3, 3)], progress.Values);
+    }
+    [Fact]
+    public async Task EmptyLibraryReportsKnownZeroAfterDiscovery()
+    {
+        using var handler = new ControlledDrive(_ => ControlledDrive.Json(new { files = Array.Empty<object>() }));
+        var progress = new ProgressLog();
+        Assert.Empty(await new GoogleDriveSource(new(handler), new ControlledToken()).ReadAsync(["empty"], progress: progress));
+        Assert.Equal([new(0, null), new MediaReadProgress(0, 0)], progress.Values);
+    }
+    [Fact]
+    public async Task CancellingDiscoveryStopsPaginationWithoutInventingTotal()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var handler = new ControlledDrive(_ =>
+        {
+            cancellation.Cancel();
+            return ControlledDrive.Json(new { nextPageToken = "next", files = new[] { File("one", "one.jpg", null) } });
+        });
+        var progress = new ProgressLog();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            new GoogleDriveSource(new(handler), new ControlledToken()).ReadAsync(["source"], cancellation.Token, progress));
+        Assert.Single(handler.Requests);
+        Assert.Equal([new MediaReadProgress(0, null)], progress.Values);
+    }
+    [Fact]
+    public async Task CancellingMetadataStopsBeforeTheNextMaterialAndNeverReportsCompletion()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var handler = new ControlledDrive(request => request.RequestUri!.Query.Contains("alt=media")
+            ? new(HttpStatusCode.PartialContent) { Content = new ByteArrayContent(MetadataTests.ExifTiff("2020:03:04 12:34:56")) }
+            : ControlledDrive.Json(new { files = new[] { File("one", "one.heic", null), File("two", "two.heic", null) } }));
+        var progress = new ProgressLog(value => { if (value.Processed == 1) cancellation.Cancel(); });
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            new GoogleDriveSource(new(handler), new ControlledToken()).ReadAsync(["source"], cancellation.Token, progress));
+        Assert.Equal([new(0, null), new(0, 2), new MediaReadProgress(1, 2)], progress.Values);
+        Assert.Equal(2, handler.Requests.Count);
+    }
+    [Fact]
+    public async Task MetadataFailureKeepsProgressAtTheLastFinishedMaterial()
+    {
+        using var handler = new ControlledDrive(request => request.RequestUri!.Query.Contains("alt=media")
+            ? new(HttpStatusCode.ServiceUnavailable)
+            : ControlledDrive.Json(new { files = new[] { File("one", "one.jpg", "2020-01-01T00:00:00Z"), File("two", "two.jpg", null) } }));
+        var progress = new ProgressLog();
+        var error = await Assert.ThrowsAsync<DriveException>(() =>
+            new GoogleDriveSource(new(handler), new ControlledToken()).ReadAsync(["source"], progress: progress));
+        Assert.Equal(DriveFailure.Network, error.Reason);
+        Assert.Equal([new(0, null), new(0, 2), new MediaReadProgress(1, 2)], progress.Values);
     }
     [Fact]
     public async Task MissingCaptureMetadataNeverFallsBackToUploadOrModificationDate()
@@ -59,9 +114,11 @@ public sealed class DriveTests
         using var handler = new ControlledDrive(request => request.RequestUri!.Query.Contains("alt=media")
             ? new(HttpStatusCode.PartialContent) { Content = new ByteArrayContent([1, 2, 3]) }
             : ControlledDrive.Json(new { files = new[] { File("undated", "undated.jpg", null) } }));
-        var assets = await new GoogleDriveSource(new(handler), new ControlledToken()).ReadAsync(["source"]);
+        var progress = new ProgressLog();
+        var assets = await new GoogleDriveSource(new(handler), new ControlledToken()).ReadAsync(["source"], progress: progress);
         Assert.Null(Assert.Single(assets).CapturedAt);
         Assert.Single(MediaClassifier.Classify(assets).Invalid);
+        Assert.Equal(new(1, 1), progress.Values[^1]);
     }
     [Fact]
     public async Task MissingFileRemainsInInvalidListAndDoesNotStopOtherMedia()
@@ -69,9 +126,11 @@ public sealed class DriveTests
         using var handler = new ControlledDrive(request => request.RequestUri!.Query.Contains("alt=media")
             ? new(HttpStatusCode.NotFound)
             : ControlledDrive.Json(new { files = new[] { File("deleted", "deleted.jpg", null), File("valid", "photo.png", "2020-01-01T00:00:00Z") } }));
-        var assets = await new GoogleDriveSource(new(handler), new ControlledToken()).ReadAsync(["source"]);
+        var progress = new ProgressLog();
+        var assets = await new GoogleDriveSource(new(handler), new ControlledToken()).ReadAsync(["source"], progress: progress);
         Assert.False(assets.Single(x => x.Id == "deleted").IsAvailable);
         Assert.Single(MediaClassifier.Classify(assets).Chronological);
+        Assert.Equal(new(2, 2), progress.Values[^1]);
     }
     [Fact]
     public async Task DownloadRestrictionsAreReportedWithoutReadingFileBody()

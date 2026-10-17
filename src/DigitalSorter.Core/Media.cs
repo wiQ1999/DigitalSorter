@@ -6,6 +6,8 @@ public enum MediaKind { Image, Video }
 public enum MediaList { Chronological, Invalid }
 
 public sealed record SourceFolder(string Id, string Name);
+// Total is unknown until all source folders and pages have been discovered.
+public sealed record MediaReadProgress(int Processed, int? Total);
 public sealed record MediaAsset(string Id, string Name, string MimeType, MediaKind Kind,
     DateTimeOffset? CapturedAt, string FolderId, bool IsAvailable = true);
 public sealed record MediaCollection(IReadOnlyList<MediaAsset> Chronological, IReadOnlyList<MediaAsset> Invalid)
@@ -16,7 +18,8 @@ public sealed record MediaCollection(IReadOnlyList<MediaAsset> Chronological, IR
 public interface IMediaLibrarySource
 {
     Task<IReadOnlyList<SourceFolder>> GetFoldersAsync(string? parentId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<MediaAsset>> ReadAsync(IEnumerable<string> folderIds, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MediaAsset>> ReadAsync(IEnumerable<string> folderIds, CancellationToken cancellationToken = default,
+        IProgress<MediaReadProgress>? progress = null);
 }
 
 public static class MediaFormats
@@ -67,7 +70,7 @@ public sealed class GalleryState
     public int InvalidCount => _collection.Invalid.Count;
     public bool CanPrevious => Index > 0;
     public bool CanNext => Index + 1 < Items.Count;
-    public IEnumerable<MediaAsset> Upcoming => Items.Skip(Index + 1).Take(5);
+    public IEnumerable<MediaAsset> GetUpcoming(int count) => Items.Skip(Index + 1).Take(count);
 
     public void Load(MediaCollection collection)
     {

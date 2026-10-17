@@ -50,7 +50,20 @@
                 @foreach (var folder in _selected.Values)
                 { <div class="selected-source"><span>▰ @folder.Name</span><button class="icon-button" aria-label="@("Usuń źródło " + folder.Name)" @onclick="() => _selected.Remove(folder.Id)">×</button></div> }
                 <button class="button primary load-button" disabled="@(_busy || _selected.Count == 0)" @onclick="Load">@(_busy ? "Odczytuję metadane…" : "Otwórz kolekcję")<span>→</span></button>
-                @if (_busy) { <button class="text-link" @onclick="() => _operation?.Cancel()">Anuluj odczyt</button> }
+                @if (_busy)
+                {
+                    <section class="metadata-progress" role="status" aria-label="Odczyt metadanych" data-testid="metadata-progress">
+                        @if (_readProgress?.Total is int total)
+                        {
+                            <span data-testid="metadata-count">Odczytano @_readProgress.Processed z @total materiałów.</span>
+                            <progress aria-label="Postęp odczytu metadanych" max="@Math.Max(1, total)" value="@_readProgress.Processed"></progress>
+                        }
+                        else
+                        { <span>Wyszukuję materiały…</span><progress aria-label="Wyszukiwanie materiałów"></progress> }
+                        <button class="text-link" @onclick="() => _operation?.Cancel()">Anuluj odczyt</button>
+                    </section>
+                }
+                else if (_loadStatus is not null) { <p class="load-status" role="status">@_loadStatus</p> }
                 <div class="source-note"><span>◈</span><p>Sortowanie wyłącznie według daty wykonania. Twoje pliki pozostają bez zmian.</p></div>
             </aside>
             <main class="gallery-main">
@@ -58,13 +71,14 @@
                 <div class="list-tabs" role="tablist" aria-label="Lista materiałów"><button role="tab" aria-selected="@(_gallery.ActiveList == MediaList.Chronological)" class="@(_gallery.ActiveList == MediaList.Chronological ? "active" : "")" @onclick="() => SwitchList(MediaList.Chronological)">Chronologicznie</button><button role="tab" aria-selected="@(_gallery.ActiveList == MediaList.Invalid)" class="@(_gallery.ActiveList == MediaList.Invalid ? "active" : "")" @onclick="() => SwitchList(MediaList.Invalid)">Bez poprawnej daty <span>@_gallery.InvalidCount</span></button></div>
                 @if (_gallery.Current is { } current)
                 {
+                    var upcomingIndex = _gallery.Index + 1;
                     <div class="viewer" data-testid="viewer"><MediaPlayer @key="(current.Id, _loadGeneration)" Asset="current" />
                         <div class="viewer-toolbar"><div class="media-caption"><span class="media-kind">@(current.Kind == MediaKind.Video ? "FILM" : "ZDJĘCIE")</span><strong>@current.Name</strong><span>@(current.CapturedAt?.ToString("dd.MM.yyyy · HH:mm:ss 'UTC'") ?? "Brak daty wykonania w metadanych")</span></div><button class="icon-button fullscreen-button" aria-label="@(_gallery.IsFullscreen ? "Zamknij pełny ekran" : "Pełny ekran")" @onclick="ToggleFullscreen">@(_gallery.IsFullscreen ? "↙" : "⛶")</button></div>
                     </div>
                     <nav class="gallery-navigation" aria-label="Nawigacja materiałów"><button class="button secondary" disabled="@(!_gallery.CanPrevious)" @onclick="Previous">← Poprzedni</button><span class="counter" data-testid="counter"><strong>@_gallery.Position</strong><span>/</span>@_gallery.Items.Count</span><button class="button secondary" disabled="@(!_gallery.CanNext)" @onclick="Next">Następny →</button></nav>
-                    <section class="upcoming"><div class="section-heading"><span class="eyebrow">ZA CHWILĘ</span><span class="muted small">Kolejne materiały</span></div><div class="thumbnail-strip">
-                    @foreach (var item in _gallery.Upcoming)
-                    { var targetIndex = _gallery.Items.ToList().IndexOf(item); <button @key="(item.Id, _loadGeneration)" class="thumbnail" @onclick="() => _gallery.Select(targetIndex)" title="@item.Name"><MediaThumbnail Asset="item" /><span class="thumbnail-kind">@(item.Kind == MediaKind.Video ? "▶" : "▧")</span><span class="thumbnail-caption">@item.Name</span></button> }
+                    <section class="upcoming"><div class="section-heading"><span class="eyebrow">ZA CHWILĘ</span><span class="muted small">Kolejne materiały</span></div><div class="thumbnail-strip" @ref="_thumbnailStrip">
+                    @foreach (var item in _gallery.GetUpcoming(_previewCapacity))
+                    { var targetIndex = upcomingIndex++; <button @key="(item.Id, _loadGeneration)" class="thumbnail" @onclick="() => _gallery.Select(targetIndex)" title="@item.Name"><MediaThumbnail Asset="item" /><span class="thumbnail-kind">@(item.Kind == MediaKind.Video ? "▶" : "▧")</span><span class="thumbnail-caption">@item.Name</span></button> }
                     </div></section>
                 }
                 else
@@ -83,9 +97,12 @@
     private readonly Dictionary<string, SourceFolder> _selected = new(StringComparer.Ordinal);
     private readonly Stack<string?> _folderStack = new();
     private IReadOnlyList<SourceFolder> _folders = [];
-    private string? _parent, _error, _folderLink;
-    private bool _initializing = true, _busy, _reauthorize, _confirmDisconnect;
-    private int _loadGeneration;
+    private string? _parent, _error, _folderLink, _loadStatus;
+    private bool _initializing = true, _busy, _reauthorize, _confirmDisconnect, _disposed, _scrollProgressIntoView;
+    private int _loadGeneration, _previewCapacity;
+    private MediaReadProgress? _readProgress;
+    private ElementReference _thumbnailStrip;
+    private IJSObjectReference? _thumbnailObserver;
     private PairingStarted? _pairing;
     private string _pairStatus = "Czekam na zatwierdzenie na telefonie…";
     private CancellationTokenSource? _operation, _pairCancellation;
@@ -93,18 +110,29 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-        try
+        if (firstRender)
         {
-            await Broker.InitializeAsync();
-            _reference = DotNetObjectReference.Create(this);
-            await Broker.Module.InvokeVoidAsync("bindGallery", _reference);
-            if (Broker.Session.Authenticated) await Browse(null);
-            var error = System.Web.HttpUtility.ParseQueryString(new Uri(Navigation.Uri).Query)["error"];
-            if (error is not null) { _reauthorize = error is "permission" or "consent"; _error = error switch { "permission" => "Dostęp tylko do odczytu Drive jest wymagany do otwarcia kolekcji.", "consent" => "Potwierdź ponownie zgodę na dostęp do Google Drive.", _ => "Logowanie nie zostało zakończone. Spróbuj ponownie." }; }
+            try
+            {
+                await Broker.InitializeAsync();
+                _reference = DotNetObjectReference.Create(this);
+                await Broker.Module.InvokeVoidAsync("bindGallery", _reference);
+                if (Broker.Session.Authenticated) await Browse(null);
+                var error = System.Web.HttpUtility.ParseQueryString(new Uri(Navigation.Uri).Query)["error"];
+                if (error is not null) { _reauthorize = error is "permission" or "consent"; _error = error switch { "permission" => "Dostęp tylko do odczytu Drive jest wymagany do otwarcia kolekcji.", "consent" => "Potwierdź ponownie zgodę na dostęp do Google Drive.", _ => "Logowanie nie zostało zakończone. Spróbuj ponownie." }; }
+            }
+            catch (Exception ex) when (ex is HttpRequestException or JSException or DriveException) { _error = "Nie udało się przygotować połączenia. Sprawdź Internet i odśwież stronę."; }
+            _initializing = false; StateHasChanged();
         }
-        catch (Exception ex) when (ex is HttpRequestException or JSException or DriveException) { _error = "Nie udało się przygotować połączenia. Sprawdź Internet i odśwież stronę."; }
-        _initializing = false; StateHasChanged();
+        if (_reference is null || _disposed) return;
+        if (_scrollProgressIntoView && _busy)
+        {
+            _scrollProgressIntoView = false;
+            await Broker.Module.InvokeVoidAsync("showReadProgress");
+        }
+        if (_gallery.Current is not null && _thumbnailObserver is null)
+            _thumbnailObserver = await Broker.Module.InvokeAsync<IJSObjectReference>("observeThumbnails", _thumbnailStrip, _reference);
+        else if (_gallery.Current is null) await StopThumbnailObserver();
     }
     private async Task Browse(string? parent)
     {
@@ -129,11 +157,28 @@
     }
     private async Task Load()
     {
-        _operation?.Cancel(); _operation?.Dispose(); _operation = new(); _busy = true; _error = null;
-        try { _gallery.Load(MediaClassifier.Classify(await Library.ReadAsync(_selected.Keys.ToArray(), _operation.Token))); _loadGeneration++; }
-        catch (OperationCanceledException) { _error = "Odczyt został anulowany."; }
+        if (_busy || _selected.Count == 0) return;
+        var operation = new CancellationTokenSource();
+        _operation = operation; _busy = true; _error = null; _loadStatus = null; _readProgress = new(0, null); _scrollProgressIntoView = true;
+        var progress = new Progress<MediaReadProgress>(value => _ = InvokeAsync(() =>
+        {
+            if (_disposed || !_busy || !ReferenceEquals(_operation, operation)) return;
+            _readProgress = value;
+            StateHasChanged();
+        }));
+        try
+        {
+            var assets = await Library.ReadAsync(_selected.Keys.ToArray(), operation.Token, progress);
+            operation.Token.ThrowIfCancellationRequested();
+            _gallery.Load(MediaClassifier.Classify(assets)); _loadGeneration++;
+            _loadStatus = $"Odczyt zakończony: {assets.Count} materiałów.";
+        }
+        catch (OperationCanceledException) when (operation.IsCancellationRequested) { _error = "Odczyt został anulowany."; }
+        catch (OperationCanceledException) { _error = "Przekroczono czas odczytu metadanych. Spróbuj ponownie."; }
         catch (DriveException ex) { Show(ex); }
-        finally { _busy = false; }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or JSException)
+        { _error = "Nie udało się odczytać metadanych. Spróbuj ponownie."; }
+        finally { _busy = false; _readProgress = null; _scrollProgressIntoView = false; _operation = null; operation.Dispose(); }
     }
     private void Show(DriveException ex) { _error = ex.Message; _reauthorize = ex.Reason == DriveFailure.Authentication; }
     private async Task Reconnect() { await SignOut(false); if (!Broker.Session.Authenticated) await StartPairing(); }
@@ -163,6 +208,13 @@
     private void Previous() => _gallery.Previous();
     private void Next() => _gallery.Next();
     private void SwitchList(MediaList list) => _gallery.SelectList(list);
+    [JSInvokable] public Task SetPreviewCapacity(int capacity)
+    {
+        capacity = Math.Max(0, capacity);
+        if (_disposed || _gallery.Current is null || _previewCapacity == capacity) return Task.CompletedTask;
+        _previewCapacity = capacity;
+        return InvokeAsync(StateHasChanged);
+    }
     private async Task ToggleFullscreen() { _gallery.ToggleFullscreen(); await Broker.Module.InvokeVoidAsync("fullscreen", _gallery.IsFullscreen); }
     [JSInvokable] public async Task Key(string key)
     {
@@ -178,13 +230,26 @@
         {
             await Broker.SignOutAsync(disconnect);
             _gallery.Load(MediaCollection.Empty); _selected.Clear(); _folderStack.Clear(); _folders = [];
-            _parent = null; _error = null; _reauthorize = false; _confirmDisconnect = false;
+            _parent = null; _error = null; _loadStatus = null; _reauthorize = false; _confirmDisconnect = false;
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException) { _error = ex.Message; }
     }
-    public ValueTask DisposeAsync()
+    private async Task StopThumbnailObserver()
     {
-        _operation?.Cancel(); _operation?.Dispose(); _pairCancellation?.Cancel(); _pairCancellation?.Dispose(); _reference?.Dispose();
-        return ValueTask.CompletedTask;
+        if (_thumbnailObserver is not { } observer) return;
+        _thumbnailObserver = null;
+        try { await observer.InvokeVoidAsync("dispose"); await observer.DisposeAsync(); }
+        catch (JSException) { }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _operation?.Cancel(); _pairCancellation?.Cancel(); _pairCancellation?.Dispose();
+        await StopThumbnailObserver();
+        if (_reference is not null)
+        {
+            try { await Broker.Module.InvokeVoidAsync("unbindGallery"); } catch (JSException) { }
+            _reference.Dispose();
+        }
     }
 }

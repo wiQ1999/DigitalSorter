@@ -1,8 +1,10 @@
 # Backlog — DigitalSorter
 
-Zadania zgłoszone podczas lokalnych testów aplikacji na rzeczywistych danych, 17.10.2026. Kolejność odpowiada zgłoszeniu; priorytety nie zostały jeszcze ustalone. Wszystkie poniższe zadania mają status **Do realizacji**.
+Zadania zgłoszone podczas lokalnych testów aplikacji na rzeczywistych danych, 17.10.2026. Kolejność odpowiada zgłoszeniu; status podano przy każdym zadaniu.
 
 ## BL-001 — Pokazywanie postępu odczytywania metadanych
+
+**Status:** Zrealizowane.
 
 Podczas odczytywania metadanych użytkownik powinien widzieć, że aplikacja pracuje, oraz postęp operacji.
 
@@ -15,6 +17,8 @@ Podczas odczytywania metadanych użytkownik powinien widzieć, że aplikacja pra
 
 ## BL-002 — Szerszy panel wyboru folderów na komputerze
 
+**Status:** Zrealizowane.
+
 Panel boczny z wyborem folderów jest zbyt wąski w widoku komputerowym. Należy zwiększyć jego szerokość, aby nazwy folderów i kontrolki były czytelniejsze.
 
 **Kryteria akceptacji:**
@@ -24,6 +28,8 @@ Panel boczny z wyborem folderów jest zbyt wąski w widoku komputerowym. Należy
 - Zmiana nie pogarsza układu na telefonie ani obsługi Android TV.
 
 ## BL-003 — Ustalenie i usunięcie problemu odtwarzania części filmów MP4
+
+**Status:** Do realizacji.
 
 Niektóre materiały wideo nie odtwarzają się i pokazują komunikat:
 
@@ -44,6 +50,8 @@ Przyczyna nie została jeszcze ustalona. Należy odtworzyć problem na wskazanym
 
 ## BL-004 — Liczba miniatur dopasowana do szerokości paska
 
+**Status:** Zrealizowane.
+
 Pasek podglądu kolejnych zdjęć i filmów powinien pokazywać tyle miniatur, ile mieści się w dostępnej szerokości na danym ekranie, zamiast ograniczać się do stałej liczby.
 
 **Kryteria akceptacji:**
@@ -54,6 +62,8 @@ Pasek podglądu kolejnych zdjęć i filmów powinien pokazywać tyle miniatur, i
 - Miniatury zachowują kolejność kolejnych materiałów; pod koniec kolekcji wyświetla się tylko dostępna liczba.
 
 ## BL-005 — Wyjaśnienie konfiguracji Google Cloud wymaganej przy łączeniu konta
+
+**Status:** Do realizacji.
 
 Podczas podłączania własnego Google Drive użytkownik musiał dodać konto w panelu platformy Google. Należy wyjaśnić, które czynności są wykonywane jednorazowo dla aplikacji, a które są wymagane dla każdego podłączanego konta.
 
@@ -67,6 +77,8 @@ Podczas podłączania własnego Google Drive użytkownik musiał dodać konto w 
 - Jeżeli dodawanie każdego konta w panelu Google wynika z trybu testowego, opisano sposób obsługi kolejnych użytkowników w docelowym wariancie.
 
 ## BL-006 — Przyspieszenie wczytywania zdjęć
+
+**Status:** Do realizacji.
 
 Podczas przeglądania rzeczywistych materiałów zdjęcia wczytują się zbyt wolno. Należy ustalić przyczynę opóźnień i skrócić czas od wybrania zdjęcia do jego wyświetlenia, także przy przechodzeniu do kolejnego materiału.
 
