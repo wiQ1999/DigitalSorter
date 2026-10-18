@@ -37,10 +37,12 @@
 ## Android TV — parowanie przez telefon
 
 - Aplikacja MAUI hostuje wspólny interfejs `DigitalSorter.Web` w WebView; adapter natywny zapewnia `SecureStorage`, konfigurację serwera i obsługę Wstecz. Logowanie Google odbywa się na telefonie.
+- Ikona i ekran startowy MAUI używają tego samego `wwwroot/icon.svg`, co znak w nagłówku Web. Kafelek launchera `Resources/Images/tv_banner.svg` zawiera ten znak i nazwę aplikacji z tekstem zamienionym na ścieżki wektorowe.
 - TV inicjuje parowanie i wyświetla QR oraz krótki kod; sekret żądania pozostaje na TV.
 - Użytkownik otwiera stronę brokera na telefonie, autoryzuje konto Google wspólnym przepływem OAuth i potwierdza powiązanie telewizora.
 - Przed zatwierdzeniem broker sprawdza autoryzację Google; ponowna zgoda zachowuje kod parowania.
 - `Broker:PairingOrigin` wskazuje adres QR niezależnie od `Broker:PublicOrigin`, który pozostaje kanonicznym adresem OAuth. Oba muszą być jawnie skonfigurowanymi originami HTTPS. Host nagłówka żądania nie steruje adresem QR.
+- Strona `/pair` inicjuje wyłącznie konfigurację i sesję brokera, także po odpowiedzi 401 wymagającej ponownej zgody. Nie uruchamia odtwarzacza ani service workera; ich niedostępność na telefonie nie powoduje błędu połączenia z brokerem.
 - Kod parowania jest jednorazowy, ma krótki termin ważności i limit prób. Odbiór sesji wymaga sekretu pierwotnego żądania TV.
 - TV odpytuje broker o wynik i po zatwierdzeniu otrzymuje niezależną sesję urządzenia. Parowanie jest mechanizmem brokera, a nie Google Device Flow.
 - Poświadczenie sesji TV jest zapisywane przez MAUI `SecureStorage`, wykluczone z kopii zapasowych i usuwane przy wylogowaniu; utrata magazynu wymaga ponownego parowania.
@@ -53,6 +55,8 @@
 - Logika interfejsu i stan aplikacji są realizowane przede wszystkim w C#; JavaScript jest ograniczony do niewielkich modułów wywoływanych przez JS interop, gdy wymagają tego API przeglądarki lub biblioteki zewnętrzne.
 - TypeScript ani dodatkowy framework JavaScript nie są częścią podstawowego stosu technologicznego.
 - Interfejs Web i TV ma stałą ciemną paletę z akcentami niebieskim, zielonym i żółtym. TV obsługuje nawigację pilotem.
+- Materiał wykorzystuje całą sekcję odtwarzacza z zachowaniem proporcji. Przezroczysty pasek opisu jest nakładką; w pełnym ekranie również nawigacja nie rezerwuje wysokości. Nakładki przy filmie pozostawiają dostęp do natywnych kontrolek wideo.
+- Potwierdzenie odłączenia konta używa modalnego `dialog`: fokus zaczyna na „Anuluj”, tło jest nieaktywne, strzałki poruszają się w obrębie okna, a Escape/Wstecz zamyka je i przywraca poprzedni fokus.
 - Na komputerze tło odtwarzacza próbkuje kolory z brzegów bieżącej klatki zdjęcia lub filmu; pełny ekran ma czarne tło.
 - Adapter przeglądarkowy w `DigitalSorter.Data.GoogleDrive` strumieniuje żądania Range z nagłówkiem OAuth przez service worker. Nie zapisuje plików ani tokenów w cache. Na Web HEIC/HEIF dekoduje klient; TV najpierw korzysta z podglądu Drive dopasowanego do ekranu. Gdy CORS Google ukrywa `Content-Range`, adapter odtwarza go z żądanego zakresu, długości odpowiedzi i rozmiaru pliku pobranego z API. Weryfikuje granice; pamięta najwyżej 64 rozmiary dla klienta, wyłącznie w RAM.
 - Krótkotrwały podpisany adres podglądu jest pobierany z uwierzytelnionego API. Pobranie obrazu z dozwolonego hosta Google nie zawiera nagłówka OAuth, który powodował nieobsługiwany preflight CORS; żądania pomijają cookies i trwały cache.

@@ -12,6 +12,7 @@ public sealed class BrokerClient(HttpClient http, IJSRuntime js, DriveOptions dr
     private string? _deviceToken;
     private TokenResponse? _googleToken;
     private IJSObjectReference? _module;
+    private ClientConfiguration? _configuration;
     private DotNetObjectReference<BrokerClient>? _reference;
     private readonly SemaphoreSlim _gate = new(1, 1);
     public bool IsTv { get; private set; }
@@ -23,24 +24,36 @@ public sealed class BrokerClient(HttpClient http, IJSRuntime js, DriveOptions dr
 
     public async Task InitializeAsync()
     {
+        var configuration = await ConfigurationAsync();
         if (_module is null)
         {
-            var configuration = await http.GetFromJsonAsync<ClientConfiguration>("api/client-config");
-            _module = await js.InvokeAsync<IJSObjectReference>("import", "./js/media.js?v=" + Uri.EscapeDataString(configuration!.AssetVersion ?? "1"));
-            driveOptions.FilesEndpoint = configuration!.DriveFilesEndpoint;
-            LoginOrigin = configuration.LoginOrigin ?? "";
+            _module = await js.InvokeAsync<IJSObjectReference>("import", "./js/media.js?v=" + Uri.EscapeDataString(configuration.AssetVersion ?? "1"));
             IsTv = await _module.InvokeAsync<bool>("isNativeTv");
             if (IsTv) _deviceToken = await _module.InvokeAsync<string?>("secureStorage", "get", null);
             _reference = DotNetObjectReference.Create(this);
             await _module.InvokeVoidAsync("initialize", _reference, IsTv, driveOptions.FilesEndpoint, configuration.AssetVersion);
         }
+        await InitializeSessionAsync();
+    }
+
+    private async Task<ClientConfiguration> ConfigurationAsync()
+    {
+        _configuration ??= await http.GetFromJsonAsync<ClientConfiguration>("api/client-config") ?? throw new HttpRequestException("Missing client configuration.");
+        driveOptions.FilesEndpoint = _configuration.DriveFilesEndpoint;
+        LoginOrigin = _configuration.LoginOrigin ?? "";
+        return _configuration;
+    }
+
+    public async Task InitializeSessionAsync()
+    {
+        await ConfigurationAsync();
         using var response = await SendAsync(HttpMethod.Get, "api/session");
         response.EnsureSuccessStatusCode();
         Session = (await response.Content.ReadFromJsonAsync<SessionInfo>())!;
         if (!Session.Authenticated && _deviceToken is not null)
         {
             _deviceToken = null;
-            await _module.InvokeVoidAsync("secureStorage", "clear", null);
+            await _module!.InvokeVoidAsync("secureStorage", "clear", null);
         }
     }
 
@@ -88,7 +101,7 @@ public sealed class BrokerClient(HttpClient http, IJSRuntime js, DriveOptions dr
     public async Task<bool> ConfirmAsync(string code)
     {
         using var response = await SendAsync(HttpMethod.Post, "api/pair/confirm", new PairingConfirmation(code));
-        if (response.StatusCode == HttpStatusCode.Unauthorized) await InitializeAsync();
+        if (response.StatusCode == HttpStatusCode.Unauthorized) await InitializeSessionAsync();
         return response.IsSuccessStatusCode;
     }
     public async Task SignOutAsync(bool disconnect)

@@ -8,6 +8,8 @@ import {
   thumbnailsFit,
   collectionRequest,
   metadataRequest,
+  mediaFillsViewer,
+  disconnectFocus,
 } from "./ui-helpers.mjs";
 
 const origin = process.env.TEST_ORIGIN ?? "https://localhost:7443";
@@ -18,6 +20,7 @@ const pin = createHash("sha256")
   .update(certificate.publicKey.export({ type: "spki", format: "der" }))
   .digest("base64");
 let browser;
+let nextClient = 1;
 const results = [];
 before(async () => {
   mkdirSync("test-results", { recursive: true });
@@ -37,7 +40,14 @@ after(async () => {
 });
 
 async function context(tv = false, viewport = { width: 1440, height: 1000 }) {
-  const ctx = await browser.newContext({ viewport });
+  // The loopback test server is a trusted proxy. Give each controlled device its
+  // own documentation-range address so unrelated tests do not share a limiter.
+  const ctx = await browser.newContext({
+    viewport,
+    extraHTTPHeaders: {
+      "X-Forwarded-For": `192.0.2.${nextClient++}`,
+    },
+  });
   const errors = [];
   ctx.on("page", (page) => {
     page.on("pageerror", (error) => errors.push(error.message));
@@ -119,6 +129,13 @@ async function checked(name, action) {
   } finally {
     await fixture.ctx.close();
   }
+}
+function withoutMediaWorkers() {
+  Object.defineProperty(navigator, "serviceWorker", {
+    get() {
+      throw new Error("Media workers are unavailable on this phone");
+    },
+  });
 }
 
 test(
@@ -790,6 +807,8 @@ test(
         path: "test-results/tv-gallery.png",
         fullPage: true,
       });
+      await mediaFillsViewer(tvPage);
+      await disconnectFocus(tvPage);
       await tvPage.getByTestId("media-stage").focus();
       await tvPage.keyboard.press("ArrowRight");
       await tvPage.waitForFunction(
@@ -835,6 +854,7 @@ test(
         b = await second.ctx.newPage();
       await login(a);
       await login(b);
+      await disconnectFocus(a);
       await a
         .getByRole("button", { name: "Odłącz konto", exact: true })
         .click();
@@ -855,6 +875,86 @@ test(
 );
 
 test(
+  "Phone: pairing works without service worker availability",
+  { timeout: 90000 },
+  async () => {
+    const tv = await context(true),
+      phone = await context();
+    try {
+      await phone.ctx.addInitScript(withoutMediaWorkers);
+      const tvPage = await tv.ctx.newPage(),
+        phonePage = await phone.ctx.newPage();
+      await tvPage.goto(origin);
+      await tvPage
+        .getByRole("button", { name: "Połącz przez telefon" })
+        .click();
+      const code = (await tvPage.locator(".pair-code").innerText()).trim();
+      await phonePage.goto(origin + "/pair?code=" + code);
+      await phonePage
+        .getByRole("link", { name: "Połącz konto Google" })
+        .click();
+      await phonePage
+        .getByRole("button", { name: "Zatwierdź dostęp testowy" })
+        .click();
+      await phonePage
+        .getByRole("button", { name: "Zatwierdź telewizor" })
+        .click();
+      await phonePage
+        .getByRole("heading", { name: "Telewizor połączony" })
+        .waitFor();
+      assert.equal(await phonePage.locator(".error-message").count(), 0);
+      assert.deepEqual(phone.errors, []);
+      assert.deepEqual(tv.errors, []);
+      results.push({
+        name: "phone-pairing-without-media-worker",
+        passed: true,
+      });
+    } finally {
+      await tv.ctx.close();
+      await phone.ctx.close();
+    }
+  },
+);
+
+test(
+  "Web: photos and video use the entire viewer beneath transparent controls",
+  { timeout: 120000 },
+  async () => {
+    await checked("transparent-media-controls", async (page) => {
+      await login(page);
+      await load(page);
+      await mediaFillsViewer(page);
+      await page
+        .getByRole("button", { name: "Pełny ekran", exact: true })
+        .click();
+      await page.waitForSelector(".app-shell.fullscreen");
+      await mediaFillsViewer(page, true);
+      await page.getByRole("button", { name: "Zamknij pełny ekran" }).click();
+      await next(page, 5);
+      await page.waitForSelector(".media-surface video");
+      await mediaFillsViewer(page);
+      await page.locator("video").evaluate((video) => video.play());
+      await page.waitForFunction(
+        () => document.querySelector("video").currentTime > 0.2,
+      );
+      await page
+        .getByRole("button", { name: "Pełny ekran", exact: true })
+        .click();
+      await mediaFillsViewer(page, true);
+      assert.equal(
+        await page
+          .locator(".gallery-navigation")
+          .evaluate((el) => getComputedStyle(el).position),
+        "fixed",
+      );
+      await page.screenshot({
+        path: "test-results/transparent-fullscreen.png",
+      });
+    });
+  },
+);
+
+test(
   "Phone: revoked Google authorization requires consent and preserves the TV code",
   { timeout: 150000 },
   async () => {
@@ -862,6 +962,12 @@ test(
     const phone = await context();
     const tvPage = await tv.ctx.newPage();
     const phonePage = await phone.ctx.newPage();
+    const responses = [];
+    phonePage.on("response", (response) => {
+      const path = new URL(response.url()).pathname;
+      if (path.startsWith("/api/pair/"))
+        responses.push({ path, status: response.status() });
+    });
     async function mode(value) {
       await phonePage.evaluate(async (mode) => {
         const response = await fetch("/test-oauth/control", {
@@ -875,6 +981,7 @@ test(
     }
     try {
       await login(phonePage);
+      await phone.ctx.addInitScript(withoutMediaWorkers);
       await tvPage.goto(origin);
       await tvPage
         .getByRole("button", { name: "Połącz przez telefon" })
@@ -941,6 +1048,22 @@ test(
         name: "phone-reauthorization-preserves-tv-pairing",
         passed: true,
       });
+    } catch (error) {
+      writeFileSync(
+        "test-results/reauthorization-failure.json",
+        JSON.stringify(
+          {
+            tv: await tvPage.locator("body").innerText(),
+            phone: await phonePage.locator("body").innerText(),
+            responses,
+            tvErrors: tv.errors,
+            phoneErrors: phone.errors,
+          },
+          null,
+          2,
+        ),
+      );
+      throw error;
     } finally {
       await mode("normal").catch(() => {});
       await tv.ctx.close();

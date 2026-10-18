@@ -3,6 +3,7 @@ let gallery;
 let activeMedia;
 let full = false;
 let nativeTv = false;
+let activeDialog;
 const prefetched = new Map();
 const contentUrl = (id) => "/drive-content/" + encodeURIComponent(id);
 const photoUrl = (id) =>
@@ -127,6 +128,10 @@ export async function initialize(reference, tv, filesEndpoint, assetVersion) {
     }
   });
   globalThis.digitalSorterBack = () => {
+    if (activeDialog) {
+      activeDialog.cancel();
+      return true;
+    }
     if (!full) return false;
     fullscreen(false);
     gallery?.invokeMethodAsync("Key", "exit");
@@ -191,6 +196,10 @@ export async function fullscreen(enabled) {
     await document.exitFullscreen();
 }
 function onKey(event) {
+  if (activeDialog) {
+    dialogKey(event);
+    return;
+  }
   if (event.target.matches("input,textarea,select")) return;
   if (["Escape", "BrowserBack"].includes(event.key)) {
     if (full) {
@@ -200,16 +209,50 @@ function onKey(event) {
     }
     return;
   }
-  if (
-    event.key === "MediaPlayPause" ||
-    (event.key === " " && event.target.closest(".media-stage"))
-  ) {
+  if (isPlaybackKey(event)) {
     toggleVideo(event);
     return;
   }
   if (navigateMedia(event)) return;
   if (document.body.classList.contains("tv") && event.key.startsWith("Arrow"))
     moveFocus(event);
+}
+function isPlaybackKey(event) {
+  return (
+    event.key === "MediaPlayPause" ||
+    (event.key === " " && event.target.closest(".media-stage"))
+  );
+}
+
+export function openDialog(element, reference) {
+  const previous = document.activeElement;
+  const cancel = () =>
+    reference.invokeMethodAsync("CancelDisconnect").catch(() => {});
+  const onCancel = (event) => {
+    event.preventDefault();
+    cancel();
+  };
+  activeDialog = { element, cancel };
+  element.addEventListener("cancel", onCancel);
+  element.showModal();
+  element.querySelector("button").focus();
+  return {
+    dispose() {
+      element.removeEventListener("cancel", onCancel);
+      element.close();
+      if (activeDialog?.element === element) activeDialog = null;
+      if (previous.isConnected) previous.focus();
+    },
+  };
+}
+function dialogKey(event) {
+  if (["Escape", "BrowserBack"].includes(event.key)) {
+    event.preventDefault();
+    activeDialog.cancel();
+  } else if (event.key.startsWith("Arrow")) {
+    event.preventDefault();
+    moveFocus(event, activeDialog.element);
+  }
 }
 function navigateMedia(event) {
   const isPlayer =
@@ -225,9 +268,9 @@ function navigateMedia(event) {
   return false;
 }
 
-function moveFocus(event) {
+function moveFocus(event, root = document) {
   const items = [
-    ...document.querySelectorAll(
+    ...root.querySelectorAll(
       'button:not(:disabled),a[href],input,[tabindex="0"]',
     ),
   ].filter(

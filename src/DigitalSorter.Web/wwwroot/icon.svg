@@ -1,1 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#0b1018"/><path d="M18 15h28v10H28v14H18z" fill="#34a853"/><path d="M18 39h28v10H18z" fill="#4285f4"/><path d="M36 25h10v14H36z" fill="#fbbc04"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <clipPath id="right"><path d="M32 32 64 0v64Z"/></clipPath>
+    <clipPath id="bottom"><path d="M32 32 64 64H0Z"/></clipPath>
+  </defs>
+  <g transform="rotate(-7 32 32)" fill-rule="evenodd">
+    <path fill="#54d995" d="M20 4H44Q60 4 60 20V44Q60 60 44 60H20Q4 60 4 44V20Q4 4 20 4Z M20 16Q16 16 16 20V44Q16 48 20 48H44Q48 48 48 44V20Q48 16 44 16Z"/>
+    <path fill="#f9d46b" clip-path="url(#right)" d="M20 4H44Q60 4 60 20V44Q60 60 44 60H20Q4 60 4 44V20Q4 4 20 4Z M20 16Q16 16 16 20V44Q16 48 20 48H44Q48 48 48 44V20Q48 16 44 16Z"/>
+    <path fill="#7ba7ff" clip-path="url(#bottom)" d="M20 4H44Q60 4 60 20V44Q60 60 44 60H20Q4 60 4 44V20Q4 4 20 4Z M20 16Q16 16 16 20V44Q16 48 20 48H44Q48 48 48 44V20Q48 16 44 16Z"/>
+  </g>
+</svg>
