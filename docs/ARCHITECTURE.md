@@ -40,6 +40,7 @@
 - TV inicjuje parowanie i wyświetla QR oraz krótki kod; sekret żądania pozostaje na TV.
 - Użytkownik otwiera stronę brokera na telefonie, autoryzuje konto Google wspólnym przepływem OAuth i potwierdza powiązanie telewizora.
 - Przed zatwierdzeniem broker sprawdza autoryzację Google; ponowna zgoda zachowuje kod parowania.
+- `Broker:PairingOrigin` wskazuje adres QR niezależnie od `Broker:PublicOrigin`, który pozostaje kanonicznym adresem OAuth. Oba muszą być jawnie skonfigurowanymi originami HTTPS. Host nagłówka żądania nie steruje adresem QR.
 - Kod parowania jest jednorazowy, ma krótki termin ważności i limit prób. Odbiór sesji wymaga sekretu pierwotnego żądania TV.
 - TV odpytuje broker o wynik i po zatwierdzeniu otrzymuje niezależną sesję urządzenia. Parowanie jest mechanizmem brokera, a nie Google Device Flow.
 - Poświadczenie sesji TV jest zapisywane przez MAUI `SecureStorage`, wykluczone z kopii zapasowych i usuwane przy wylogowaniu; utrata magazynu wymaga ponownego parowania.
@@ -52,11 +53,16 @@
 - Logika interfejsu i stan aplikacji są realizowane przede wszystkim w C#; JavaScript jest ograniczony do niewielkich modułów wywoływanych przez JS interop, gdy wymagają tego API przeglądarki lub biblioteki zewnętrzne.
 - TypeScript ani dodatkowy framework JavaScript nie są częścią podstawowego stosu technologicznego.
 - Interfejs Web i TV ma stałą ciemną paletę z akcentami niebieskim, zielonym i żółtym. TV obsługuje nawigację pilotem.
-- Tło odtwarzacza próbkuje kolory z brzegów bieżącej klatki zdjęcia lub filmu; pełny ekran ma czarne tło.
-- Adapter przeglądarkowy w `DigitalSorter.Data.GoogleDrive` strumieniuje żądania Range z nagłówkiem OAuth przez service worker. Nie zapisuje plików ani tokenów w cache; HEIC/HEIF dekoduje klient.
-- Gdy miniatura Drive jest niedostępna lub blokowana przez CORS, klient tworzy podgląd z oryginalnego zdjęcia albo klatki filmu; bez pośrednictwa backendu.
+- Na komputerze tło odtwarzacza próbkuje kolory z brzegów bieżącej klatki zdjęcia lub filmu; pełny ekran ma czarne tło.
+- Adapter przeglądarkowy w `DigitalSorter.Data.GoogleDrive` strumieniuje żądania Range z nagłówkiem OAuth przez service worker. Nie zapisuje plików ani tokenów w cache. Na Web HEIC/HEIF dekoduje klient; TV najpierw korzysta z podglądu Drive dopasowanego do ekranu. Gdy CORS Google ukrywa `Content-Range`, adapter odtwarza go z żądanego zakresu, długości odpowiedzi i rozmiaru pliku pobranego z API. Weryfikuje granice; pamięta najwyżej 64 rozmiary dla klienta, wyłącznie w RAM.
+- Krótkotrwały podpisany adres podglądu jest pobierany z uwierzytelnionego API. Pobranie obrazu z dozwolonego hosta Google nie zawiera nagłówka OAuth, który powodował nieobsługiwany preflight CORS; żądania pomijają cookies i trwały cache.
+- Gdy miniatura Drive jest niedostępna lub blokowana przez CORS, klient tworzy podgląd z oryginalnego zdjęcia albo klatki filmu; bez pośrednictwa backendu. Na TV kosztowne awaryjne dekodowanie miniatur filmów i HEIF zastępuje ikona.
 - Źródło biblioteki raportuje `MediaReadProgress` przez `IProgress`: wyszukiwanie bez znanej całości, następnie odczyt unikalnych obsługiwanych materiałów. `ResizeObserver` dopasowuje liczbę miniatur do szerokości paska; Core zwraca żądaną liczbę kolejnych pozycji.
 - Sesja webowa używa cookie `HttpOnly`, `Secure`, z określoną ważnością, polityką `SameSite` i ochroną CSRF.
+
+- Odczyt JPEG pomija dane obrazu po nagłówkach; trzy zadania równolegle odczytują brakujące metadane, zachowując kolejność i anulowanie. Drive `createdTime` i `modifiedTime` nie zastępują daty wykonania.
+- Klient przygotowuje jedno następne zdjęcie w RAM: podgląd 1920 px na Web i 1280 px na TV. Pełny ekran na Web pobiera oryginał dla pełnej jakości. Przekazuje przygotowany element obrazu do odtwarzacza bez ponownego pobierania; wylogowanie i zmiana kolekcji zwalniają go. Nie używa CacheStorage, IndexedDB ani localStorage do mediów/tokenów.
+- Broker wylicza rewizję CSS/JS; klient wersjonuje adres modułu i arkuszy, żeby WebView po aktualizacji nie zachowywał starego układu. Zasoby interfejsu wymagają rewalidacji; nie wpływa to na zakaz trwałego cache materiałów.
 
 ## Hosting i wdrożenie
 

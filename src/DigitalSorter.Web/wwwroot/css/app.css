@@ -675,6 +675,9 @@ input::placeholder {
   object-fit: cover;
   color: transparent;
 }
+body.tv .thumbnail img:not([src]) {
+  visibility: hidden;
+}
 .thumbnail-unavailable {
   display: grid;
   place-items: center;
@@ -946,54 +949,6 @@ input::placeholder {
 .fullscreen .viewer-toolbar {
   background: #080b10;
 }
-.tv {
-  font-size: 18px;
-}
-.tv button,
-.tv .button,
-.tv input {
-  min-height: 50px;
-}
-.tv .app-header {
-  height: 86px;
-}
-.tv .brand-caption {
-  display: none;
-}
-.tv .gallery-main {
-  padding-top: 20px;
-}
-.tv .sidebar {
-  padding-top: 23px;
-}
-.tv .workspace {
-  grid-template-columns: 290px 1fr;
-}
-.tv .gallery-heading {
-  margin-bottom: 12px;
-}
-.tv .gallery-heading h1 {
-  font-size: 1.5rem;
-}
-.tv .app-shell:not(.fullscreen) .media-stage {
-  aspect-ratio: auto;
-  height: clamp(160px, calc(100dvh - 590px), 580px);
-  min-height: 160px;
-}
-.tv .gallery-navigation {
-  padding: 12px 0;
-}
-.tv .app-footer {
-  display: none;
-}
-.tv .welcome {
-  min-height: 80vh;
-  padding-top: 5vh;
-  padding-bottom: 5vh;
-}
-.tv .welcome-art {
-  height: 330px;
-}
 #blazor-error-ui {
   display: none;
   position: fixed;
@@ -1008,91 +963,6 @@ input::placeholder {
 }
 #blazor-error-ui a {
   text-decoration: underline;
-}
-@media (max-height: 700px) {
-  .tv .has-media:not(.fullscreen) {
-    height: 100dvh;
-    min-height: 0;
-    overflow: hidden;
-  }
-  .tv .has-media:not(.fullscreen) .app-header {
-    height: 48px;
-    flex-shrink: 0;
-  }
-  .tv .has-media:not(.fullscreen) .workspace {
-    height: calc(100dvh - 48px);
-    min-height: 0;
-    grid-template-columns: 220px minmax(0, 1fr);
-  }
-  .tv .has-media:not(.fullscreen) .sidebar {
-    overflow: auto;
-    padding: 14px 16px;
-  }
-  .tv .has-media:not(.fullscreen) .source-note {
-    display: none;
-  }
-  .tv .has-media:not(.fullscreen) .gallery-main {
-    height: 100%;
-    min-height: 0;
-    padding: 12px 16px;
-    display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
-  }
-  .tv .has-media:not(.fullscreen) .gallery-heading {
-    margin-bottom: 6px;
-  }
-  .tv .has-media:not(.fullscreen) .gallery-heading h1 {
-    font-size: 1.3rem;
-    margin-top: 3px;
-  }
-  .tv .has-media:not(.fullscreen) button,
-  .tv .has-media:not(.fullscreen) input {
-    min-height: 32px;
-  }
-  .tv .has-media:not(.fullscreen) input[type="checkbox"] {
-    min-height: 20px;
-  }
-  .tv .has-media:not(.fullscreen) .list-tabs {
-    margin-bottom: 8px;
-  }
-  .tv .has-media:not(.fullscreen) .list-tabs button {
-    padding: 6px 0;
-  }
-  .tv .has-media:not(.fullscreen) .viewer {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-  .tv .has-media:not(.fullscreen) .media-stage {
-    flex: 1;
-    height: auto;
-    min-height: 0;
-  }
-  .tv .has-media:not(.fullscreen) .viewer-toolbar {
-    flex-shrink: 0;
-    padding: 6px 12px;
-  }
-  .tv .has-media:not(.fullscreen) .fullscreen-button {
-    height: 32px;
-    padding: 2px 8px;
-    font-size: 1.3rem;
-  }
-  .tv .has-media:not(.fullscreen) .gallery-navigation {
-    padding: 6px 0;
-  }
-  .tv .has-media:not(.fullscreen) .section-heading {
-    margin-bottom: 4px;
-  }
-  .tv .has-media:not(.fullscreen) .thumbnail-strip {
-    --thumbnail-min-width: 96px;
-    min-height: 0;
-    height: 56px;
-    gap: 8px;
-  }
-  .tv .has-media:not(.fullscreen) .thumbnail {
-    height: 56px;
-    aspect-ratio: auto;
-  }
 }
 @media (max-width: 1000px) {
   .brand-caption,
@@ -1255,5 +1125,280 @@ input::placeholder {
   *:after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* TV uses the WebView viewport (often 960 × 540 CSS pixels), including pairing. */
+body.tv {
+  overflow: hidden;
+  font-size: 15px;
+}
+.tv .app-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.tv .app-header,
+.tv .has-media:not(.fullscreen) .app-header {
+  height: 56px;
+  min-height: 56px;
+  flex-shrink: 0;
+  padding: 0 3vw;
+  gap: 12px;
+}
+.tv .brand {
+  font-size: 1.25rem;
+}
+.tv .brand-mark {
+  width: 28px;
+  height: 28px;
+  border-width: 5px;
+}
+.tv .account-actions {
+  gap: 8px;
+}
+.tv button,
+.tv .button,
+.tv input {
+  min-height: 36px;
+}
+.tv input[type="checkbox"] {
+  min-height: 20px;
+}
+.tv .welcome {
+  display: flex;
+  min-height: 0;
+  max-width: none;
+  height: calc(100dvh - 56px);
+  padding: 3vh 5vw;
+  gap: 0;
+}
+.tv .welcome-copy {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  align-items: center;
+  column-gap: 5vw;
+}
+.tv .welcome-copy > .eyebrow {
+  grid-column: 1;
+}
+.tv .welcome h1 {
+  grid-column: 1;
+  font-size: clamp(1.8rem, 3.6vw, 3.6rem);
+  margin: 12px 0;
+}
+.tv .welcome-copy > p {
+  grid-column: 1;
+  font-size: 1rem;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+.tv .welcome-art,
+.tv .welcome-trust,
+.tv .app-footer,
+.tv .brand-caption {
+  display: none;
+}
+.tv .welcome-copy > .button {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  justify-self: center;
+}
+.tv .tv-pairing {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  margin: 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  text-align: center;
+  background: var(--panel);
+  backdrop-filter: none;
+}
+.tv .tv-pairing img {
+  width: clamp(128px, 28vh, 260px);
+  height: clamp(128px, 28vh, 260px);
+  flex-shrink: 0;
+}
+.tv .tv-pairing p {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+}
+.tv .tv-pairing strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+.tv .pair-code {
+  font-size: 1.8rem;
+  line-height: 1.2;
+  margin: 8px 0;
+  letter-spacing: 0.12em;
+}
+.tv .tv-pairing small {
+  display: block;
+  font-size: 0.8rem;
+}
+.tv .tv-pairing .text-link {
+  padding: 4px 8px;
+  margin: 0;
+}
+.tv .workspace,
+.tv .has-media:not(.fullscreen) .workspace {
+  flex: 1;
+  height: calc(100dvh - 56px);
+  min-height: 0;
+  grid-template-columns: minmax(260px, 38%) minmax(0, 1fr);
+}
+.tv .sidebar,
+.tv .has-media:not(.fullscreen) .sidebar {
+  min-height: 0;
+  height: 100%;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.tv .sidebar h2 {
+  margin: 4px 0;
+  font-size: 1.2rem;
+}
+.tv .sidebar > .muted,
+.tv .source-note {
+  display: none;
+}
+.tv .folder-list {
+  min-height: 52px;
+  max-height: none;
+  flex: 1;
+  overflow: auto;
+}
+.tv .folder-row {
+  min-height: 36px;
+}
+.tv .load-button {
+  margin-top: 10px;
+  flex-shrink: 0;
+}
+.tv .folder-location,
+.tv .input-label,
+.tv .folder-add,
+.tv .selected-source {
+  flex-shrink: 0;
+}
+.tv .selected-source {
+  margin-top: 4px;
+  padding: 2px 8px;
+}
+.tv .has-media:not(.sources-open) .sidebar {
+  display: none;
+}
+.tv .has-media:not(.sources-open) .workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+.tv .has-media:not(.fullscreen) .gallery-main {
+  height: 100%;
+  min-height: 0;
+  padding: 10px 3vw;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+}
+.tv .has-media:not(.fullscreen) .gallery-heading {
+  display: none;
+}
+.tv .has-media:not(.fullscreen) .list-tabs {
+  margin-bottom: 6px;
+}
+.tv .has-media:not(.fullscreen) .list-tabs button {
+  padding: 4px 0;
+}
+.tv .has-media:not(.fullscreen) .viewer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.tv .has-media:not(.fullscreen) .media-stage {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+.tv .has-media:not(.fullscreen) .viewer-toolbar {
+  padding: 4px 12px;
+  flex-shrink: 0;
+}
+.tv .has-media:not(.fullscreen) .gallery-navigation {
+  padding: 6px 0;
+}
+.tv .has-media:not(.fullscreen) .section-heading {
+  display: none;
+}
+.tv .has-media:not(.fullscreen) .thumbnail-strip {
+  --thumbnail-min-width: 112px;
+  height: clamp(52px, 11vh, 108px);
+  min-height: 0;
+  gap: 10px;
+}
+.tv .has-media:not(.fullscreen) .thumbnail {
+  height: 100%;
+  aspect-ratio: auto;
+}
+.tv *,
+.tv *::before,
+.tv *::after {
+  transition: none !important;
+  animation: none !important;
+  backdrop-filter: none !important;
+}
+.tv .ambient {
+  display: none;
+}
+.tv .media-surface img,
+.tv .media-surface video {
+  filter: none;
+}
+.tv .metadata-progress {
+  margin-top: 6px;
+  padding: 8px;
+  flex-shrink: 0;
+}
+.tv .spinner {
+  animation: spin 1s linear infinite !important;
+}
+.tv .brand-caption,
+.tv .brand-divider {
+  display: none;
+}
+.tv .gallery-main {
+  min-height: 0;
+  padding: 16px 3vw;
+}
+.tv .gallery-heading h1 {
+  font-size: 1.5rem;
+}
+.media-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #0b1018b0;
+  pointer-events: none;
+}
+@media (max-height: 480px) {
+  .tv .welcome h1 {
+    font-size: 1.8rem;
+  }
+  .tv .tv-pairing {
+    flex-direction: row;
+    padding: 10px;
+  }
+  .tv .tv-pairing img {
+    width: 120px;
+    height: 120px;
   }
 }

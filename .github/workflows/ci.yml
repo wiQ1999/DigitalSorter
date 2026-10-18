@@ -45,7 +45,7 @@ jobs:
           path: |
             src/DigitalSorter.AndroidTV/bin/Release/net10.0-android/android-arm64/*Signed.apk
             test-results/native-fixture
-          key: native-tv-v1-${{ runner.os }}-${{ steps.native-day.outputs.date }}-${{ hashFiles('global.json', 'Directory.Build.props', 'src/DigitalSorter.AndroidTV/**', 'tests/native/*.xml', 'tests/native/create-certificate.ps1') }}
+          key: native-tv-v2-${{ runner.os }}-${{ steps.native-day.outputs.date }}-${{ hashFiles('global.json', 'Directory.Build.props', 'src/DigitalSorter.AndroidTV/**', 'tests/native/*.xml', 'tests/native/create-certificate.ps1', 'scripts/check-tv-apk.ps1') }}
       - uses: actions/setup-dotnet@v6.0.0
         if: steps.native-cache.outputs.cache-hit != 'true'
         with:
@@ -59,6 +59,9 @@ jobs:
         if: steps.native-cache.outputs.cache-hit != 'true'
       - run: dotnet build src/DigitalSorter.AndroidTV -c Release -p:RuntimeIdentifier=android-arm64 -p:RestoreLockedMode=true -warnaserror
         if: steps.native-cache.outputs.cache-hit != 'true'
+      - name: Verify ARM32, ARM64 and x64 libraries in the universal APK
+        shell: pwsh
+        run: scripts/check-tv-apk.ps1 -Path (Get-Item src/DigitalSorter.AndroidTV/bin/Release/net10.0-android/android-arm64/*Signed.apk).FullName
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: android-tv-test-apk

@@ -23,7 +23,7 @@ public sealed class PairingService(BrokerDb db, TimeProvider clock, IConfigurati
         await db.Sessions.Where(x => x.ExpiresAt < now).ExecuteDeleteAsync(ct);
         db.Pairings.Add(pairing);
         await db.SaveChangesAsync(ct);
-        var origin = config["Broker:PublicOrigin"]!.TrimEnd('/');
+        var origin = BrokerOrigins.Pairing(config).TrimEnd('/');
         return new(pairing.Id, code[..4] + "-" + code[4..], secret, origin + "/pair?code=" + code, pairing.ExpiresAt);
     }
 

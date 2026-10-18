@@ -3,12 +3,14 @@
 @inject IMediaLibrarySource Library
 @inject NavigationManager Navigation
 
-<div class="app-shell @(_gallery.IsFullscreen ? "fullscreen" : "") @(_gallery.Current is not null ? "has-media" : "") @(_busy ? "is-busy" : "")">
+<div class="app-shell @(_gallery.IsFullscreen ? "fullscreen" : "") @(_gallery.Current is not null ? "has-media" : "") @(_busy ? "is-busy" : "") @(_sourcesOpen ? "sources-open" : "")">
     <header class="app-header">
         <a href="/" class="brand"><span class="brand-mark"></span>DigitalSorter<span class="brand-divider"></span><span class="brand-caption">chwile, po kolei</span></a>
         <div class="account-actions"><span class="privacy"><i></i>Tylko do odczytu</span>
         @if (Broker.Session.Authenticated)
         {
+            @if (Broker.IsTv && _gallery.Current is not null)
+            { <button class="icon-button" aria-expanded="@_sourcesOpen" @onclick="() => _sourcesOpen = !_sourcesOpen">Źródła</button> }
             <span class="account-name">@Broker.Session.DisplayName</span>
             <button class="icon-button" title="Wyloguj tę sesję" @onclick="() => SignOut(false)">Wyloguj</button>
             <button class="icon-button danger" title="Odłącz Google we wszystkich urządzeniach" @onclick="() => _confirmDisconnect = true">Odłącz konto</button>
@@ -21,7 +23,7 @@
         <main class="welcome">
             <div class="welcome-copy"><span class="eyebrow">TWOJA PRYWATNA GALERIA</span><h1>Każda chwila.<br /><span>Na swoim miejscu.</span></h1><p>Zdjęcia i filmy z Google Drive, ułożone według daty wykonania. Bez zmieniania Twoich plików.</p>
             @if (!Broker.IsTv)
-            { <a class="button primary google-button" href="@(_reauthorize ? "/auth/login?consent=true" : "/auth/login")"><span class="google-g">G</span>Połącz Google Drive<span>→</span></a><a class="text-link" href="/pair">Połącz telewizor</a> }
+            { <a class="button primary google-button" href="@Broker.LoginUrl(consent: _reauthorize)"><span class="google-g">G</span>Połącz Google Drive<span>→</span></a><a class="text-link" href="/pair">Połącz telewizor</a> }
             else if (_pairing is null)
             { <button class="button primary" @onclick="StartPairing">Połącz przez telefon</button> }
             else
@@ -86,7 +88,7 @@
             </main>
         </div>
     }
-    @if (_error is not null) { <div class="toast" role="alert"><span>@_error</span><button class="icon-button" aria-label="Zamknij komunikat" @onclick="() => _error = null">×</button>@if (_reauthorize) { @if (Broker.IsTv) { <button class="text-link" @onclick="Reconnect">Połącz ponownie</button> } else { <a href="/auth/login?consent=true">Połącz ponownie</a> } }</div> }
+    @if (_error is not null) { <div class="toast" role="alert"><span>@_error</span><button class="icon-button" aria-label="Zamknij komunikat" @onclick="() => _error = null">×</button>@if (_reauthorize) { @if (Broker.IsTv) { <button class="text-link" @onclick="Reconnect">Połącz ponownie</button> } else { <a href="@Broker.LoginUrl(consent: true)">Połącz ponownie</a> } }</div> }
     @if (_confirmDisconnect)
     { <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="disconnect-title"><h2 id="disconnect-title">Odłączyć konto Google?</h2><p>Dostęp zostanie cofnięty w przeglądarkach i wszystkich powiązanych telewizorach. Pliki na Drive pozostaną bez zmian.</p><button class="button" @onclick="() => _confirmDisconnect = false">Anuluj</button><button class="button danger" @onclick="() => SignOut(true)">Odłącz wszędzie</button></section></div> }
     <footer class="app-footer"><span>DIGITALSORTER</span><span>Wspomnienia należą do Ciebie.</span><span class="palette-dots"><i></i><i></i><i></i></span></footer>
@@ -98,14 +100,16 @@
     private readonly Stack<string?> _folderStack = new();
     private IReadOnlyList<SourceFolder> _folders = [];
     private string? _parent, _error, _folderLink, _loadStatus;
-    private bool _initializing = true, _busy, _reauthorize, _confirmDisconnect, _disposed, _scrollProgressIntoView;
+    private bool _initializing = true, _busy, _reauthorize, _confirmDisconnect, _disposed, _scrollProgressIntoView, _sourcesOpen;
     private int _loadGeneration, _previewCapacity;
+    private string? _prefetchAfter;
     private MediaReadProgress? _readProgress;
     private ElementReference _thumbnailStrip;
     private IJSObjectReference? _thumbnailObserver;
     private PairingStarted? _pairing;
     private string _pairStatus = "Czekam na zatwierdzenie na telefonie…";
     private CancellationTokenSource? _operation, _pairCancellation;
+    private CancellationTokenSource? _progressRenderOperation;
     private DotNetObjectReference<Gallery>? _reference;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -129,6 +133,14 @@
         {
             _scrollProgressIntoView = false;
             await Broker.Module.InvokeVoidAsync("showReadProgress");
+        }
+        var currentId = _gallery.Current?.Id;
+        if (currentId != _prefetchAfter)
+        {
+            _prefetchAfter = currentId;
+            await Broker.Module.InvokeVoidAsync("prefetchMedia", (object)_gallery.GetUpcoming(1)
+                .Where(x => x.Kind == MediaKind.Image && x.IsAvailable)
+                .Select(x => new { x.Id, x.Name, x.MimeType, x.Size }).ToArray(), currentId);
         }
         if (_gallery.Current is not null && _thumbnailObserver is null)
             _thumbnailObserver = await Broker.Module.InvokeAsync<IJSObjectReference>("observeThumbnails", _thumbnailStrip, _reference);
@@ -160,17 +172,15 @@
         if (_busy || _selected.Count == 0) return;
         var operation = new CancellationTokenSource();
         _operation = operation; _busy = true; _error = null; _loadStatus = null; _readProgress = new(0, null); _scrollProgressIntoView = true;
-        var progress = new Progress<MediaReadProgress>(value => _ = InvokeAsync(() =>
-        {
-            if (_disposed || !_busy || !ReferenceEquals(_operation, operation)) return;
-            _readProgress = value;
-            StateHasChanged();
-        }));
+        var progress = new Progress<MediaReadProgress>(value => _ = InvokeAsync(() => ReportProgress(value, operation)));
         try
         {
             var assets = await Library.ReadAsync(_selected.Keys.ToArray(), operation.Token, progress);
             operation.Token.ThrowIfCancellationRequested();
+            await Broker.Module.InvokeVoidAsync("clearMedia");
+            _prefetchAfter = null;
             _gallery.Load(MediaClassifier.Classify(assets)); _loadGeneration++;
+            _sourcesOpen = false;
             _loadStatus = $"Odczyt zakończony: {assets.Count} materiałów.";
         }
         catch (OperationCanceledException) when (operation.IsCancellationRequested) { _error = "Odczyt został anulowany."; }
@@ -179,6 +189,16 @@
         catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or JSException)
         { _error = "Nie udało się odczytać metadanych. Spróbuj ponownie."; }
         finally { _busy = false; _readProgress = null; _scrollProgressIntoView = false; _operation = null; operation.Dispose(); }
+    }
+    private async Task ReportProgress(MediaReadProgress value, CancellationTokenSource operation)
+    {
+        if (_disposed || !_busy || !ReferenceEquals(_operation, operation)) return;
+        _readProgress = value;
+        if (ReferenceEquals(_progressRenderOperation, operation)) return;
+        _progressRenderOperation = operation;
+        await Task.Delay(100);
+        if (ReferenceEquals(_progressRenderOperation, operation)) _progressRenderOperation = null;
+        if (!_disposed && _busy && ReferenceEquals(_operation, operation)) StateHasChanged();
     }
     private void Show(DriveException ex) { _error = ex.Message; _reauthorize = ex.Reason == DriveFailure.Authentication; }
     private async Task Reconnect() { await SignOut(false); if (!Broker.Session.Authenticated) await StartPairing(); }

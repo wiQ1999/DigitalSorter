@@ -9,7 +9,7 @@ public sealed record SourceFolder(string Id, string Name);
 // Total is unknown until all source folders and pages have been discovered.
 public sealed record MediaReadProgress(int Processed, int? Total);
 public sealed record MediaAsset(string Id, string Name, string MimeType, MediaKind Kind,
-    DateTimeOffset? CapturedAt, string FolderId, bool IsAvailable = true);
+    DateTimeOffset? CapturedAt, string FolderId, bool IsAvailable = true, long? Size = null);
 public sealed record MediaCollection(IReadOnlyList<MediaAsset> Chronological, IReadOnlyList<MediaAsset> Invalid)
 {
     public static MediaCollection Empty { get; } = new([], []);

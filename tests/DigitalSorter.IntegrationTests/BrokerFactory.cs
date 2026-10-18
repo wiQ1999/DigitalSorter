@@ -95,6 +95,7 @@ public class BrokerFactory : WebApplicationFactory<Program>
     public TestClock Clock { get; } = new();
     public string? Failure { get; private set; }
     public string PublicOrigin { get; set; } = "https://localhost";
+    public string? PairingOrigin { get; set; }
     public string EnvironmentName { get; set; } = "Testing";
     public BrokerFactory(string? dataDirectory = null) => DataDirectory = dataDirectory ?? Path.Combine(Path.GetTempPath(), "digitalsorter-tests-" + Guid.NewGuid());
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -106,6 +107,7 @@ public class BrokerFactory : WebApplicationFactory<Program>
         builder.UseEnvironment(EnvironmentName);
         builder.UseSetting("Broker:DataDirectory", DataDirectory);
         builder.UseSetting("Broker:PublicOrigin", PublicOrigin);
+        if (PairingOrigin is not null) builder.UseSetting("Broker:PairingOrigin", PairingOrigin);
         builder.UseSetting("Broker:TokenEncryptionKey", Convert.ToBase64String(Enumerable.Repeat((byte)17, 32).ToArray()));
         builder.UseSetting("Google:ClientId", ControlledGoogle.Client);
         builder.UseSetting("Google:ClientSecret", ControlledGoogle.Secret);

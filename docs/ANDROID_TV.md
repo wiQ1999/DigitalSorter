@@ -6,7 +6,7 @@ Poniższe polecenia laptopa używają PowerShell na Windows. Android SDK Platfor
 
 ## 1. Sprawdzenie urządzenia i połączenia USB
 
-Wymagany jest Android TV/Google TV, nie dowolny system Smart TV. Projekt obsługuje Android 7.0/API 24+ oraz architektury ARM64 i x64; obecnie nie zawiera wersji ARM 32-bit. Aplikacja wymaga działającego Android System WebView.
+Wymagany jest Android TV/Google TV, nie dowolny system Smart TV. Projekt obsługuje Android 7.0/API 24+ oraz architektury ARM 32-bit (`armeabi-v7a`), ARM64 (`arm64-v8a`) i x64 (`x86_64`). Aplikacja wymaga działającego Android System WebView.
 
 1. Zainstaluj na laptopie [Android SDK Platform-Tools](https://developer.android.com/tools/releases/platform-tools), dodaj katalog `platform-tools` do `PATH` i sprawdź `adb version`.
 2. Na TV otwórz Ustawienia → Informacje o urządzeniu. Kilkukrotnie wybierz numer kompilacji, aż pojawi się informacja o włączeniu opcji programisty. Nazwy ekranów zależą od producenta.
@@ -20,7 +20,7 @@ adb shell getprop ro.product.cpu.abilist
 adb shell getprop ro.build.version.sdk
 ```
 
-Oczekiwany stan ADB to `device`. `unauthorized` oznacza brak zatwierdzenia klucza na TV. Lista ABI musi zawierać `arm64-v8a` dla pakietu ARM64 albo `x86_64` dla x64.
+Oczekiwany stan ADB to `device`. `unauthorized` oznacza brak zatwierdzenia klucza na TV. Wspierane ABI to `armeabi-v7a`, `arm64-v8a` i `x86_64`. Philips 55POS9002/12 / TPM171E z Androidem 8 wymaga ARM32 mimo 64-bitowych procesorów spotykanych w nowszych TV.
 
 Wiele telewizorów ma wyłącznie porty USB host do pamięci i akcesoriów, bez trybu ADB po kablu. Sam kabel ani przejściówka nie dodają tej funkcji; nie łącz dwóch portów host zwykłym przewodem USB-A–USB-A. Jeśli producent nie wspiera ADB po USB, potrzebne jest obsługiwane przez niego debugowanie sieciowe lub instalacja z Google Play. [Dokumentacja ADB](https://developer.android.com/tools/adb) opisuje także parowanie bezprzewodowe.
 
@@ -30,7 +30,7 @@ Wiele telewizorów ma wyłącznie porty USB host do pamięci i akcesoriów, bez 
 
 1. W repozytorium otwórz Actions → `Validate` i wybierz udany przebieg dla właściwego commita.
 2. Pobierz artefakt `android-tv-test-apk` i rozpakuj ZIP.
-3. Użyj znajdującego się w nim `pl.wiq1999.digitalsorter.androidtv-Signed.apk` dla ARM64.
+3. Użyj znajdującego się w nim `pl.wiq1999.digitalsorter.androidtv-Signed.apk` z bibliotekami ARM32, ARM64 i x64.
 
 Jest to pakiet do testów, podpisany kluczem środowiska budowania. Nie jest pakietem wydawcy dla Google Play; podpis może zmienić się między przebiegami CI. Artefakt `native-tv-fixture` zawiera specjalny pakiet emulatora x64 z testowym CA — nie używaj go do zwykłej instalacji na TV.
 
@@ -47,7 +47,7 @@ dotnet build src/DigitalSorter.AndroidTV -c Debug -p:RuntimeIdentifier=android-a
 
 Jeżeli SDK nie są wykrywane, dodaj argumenty `-p:AndroidSdkDirectory="$env:ANDROID_HOME"` i `-p:JavaSdkDirectory="$env:JAVA_HOME"`.
 
-Wynik: `src/DigitalSorter.AndroidTV/bin/Debug/net10.0-android/android-arm64/pl.wiq1999.digitalsorter.androidtv-Signed.apk`. Dla x64 zmień `android-arm64` na `android-x64` w komendzie i ścieżce. Native TV ładuje Web z serwera; nie kopiuje się frontendu osobno na telewizor.
+Wynik: `src/DigitalSorter.AndroidTV/bin/Debug/net10.0-android/android-arm64/pl.wiq1999.digitalsorter.androidtv-Signed.apk`. Projekt deklaruje trzy RID, więc APK zawiera wszystkie trzy ABI; katalog wyniku zależy od wybranego `RuntimeIdentifier`. Sprawdź pakiet przez `scripts/check-tv-apk.ps1 -Path <plik.apk>`. Nie nadpisuj `RuntimeIdentifiers` pojedynczym RID, jeśli potrzebujesz uniwersalnego pakietu. Native TV ładuje Web z serwera; nie kopiuje się frontendu osobno na telewizor.
 
 ## 3. Instalacja APK przez USB
 
@@ -55,7 +55,7 @@ Po pobraniu lub zbudowaniu APK ustaw jego rzeczywistą ścieżkę:
 
 ```powershell
 $apk = "C:\sciezka\pl.wiq1999.digitalsorter.androidtv-Signed.apk"
-adb install -r "$apk"
+adb install --no-streaming -r "$apk"
 adb shell pm path pl.wiq1999.digitalsorter.androidtv
 adb shell monkey -p pl.wiq1999.digitalsorter.androidtv -c android.intent.category.LEANBACK_LAUNCHER 1
 ```
@@ -75,6 +75,10 @@ Jeżeli pojawia się `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, podpis zainstalowanej
 7. Sprawdź strzałki, OK, Play/Pause oraz Wstecz z pełnego ekranu. Zamknij i uruchom aplikację ponownie; sesja powinna pozostać aktywna. W demo pozostaw backend uruchomiony — jego zatrzymanie usuwa tymczasowe dane parowania.
 
 Logowanie Google nie odbywa się w WebView telewizora. Backend zachowuje zaszyfrowany Google `refresh_token`, a TV własną sesję w `SecureStorage`. Wstecz poza odtwarzaczem otwiera menu umożliwiające zmianę serwera. Wylogowanie TV usuwa jego sesję; odłączenie Google unieważnia dostęp wszystkich powiązanych klientów.
+
+Widok TV mieści parowanie, materiał, nawigację i pasek miniatur w całym obszarze WebView (także 960×540 CSS px przy obrazie 1920×1080). Po otwarciu kolekcji przycisk **Źródła** przełącza panel folderów. Długie listy przewijają się wewnątrz panelu, bez przewijania strony. TV używa podglądów Drive do 1280 px, bez rozmyć i ciągłego próbkowania filmu; brak miniatury wideo/HEIF pokazuje zastępczą ikonę zamiast uruchamiać dodatkowy dekoder. Oryginał pozostaje źródłem filmu i awaryjnego wyświetlania zdjęcia.
+
+Do testów przez Wi-Fi na tym Philipsie działa autoryzowane `adb connect ADRES_TV:5555`. Używaj `--no-streaming`, jeżeli instalacja strumieniowa zatrzymuje się pod koniec transferu. Nie każdy TV udostępnia ADB przez LAN; po testach wyłącz debugowanie.
 
 Po instalacji możesz odłączyć USB i wyłączyć debugowanie; działanie aplikacji go nie wymaga.
 
@@ -118,7 +122,7 @@ dotnet publish src/DigitalSorter.AndroidTV -f net10.0-android -c Release `
   -p:RestoreLockedMode=true
 ```
 
-Projekt deklaruje ARM64 oraz x64. `UseDefaultPublishRuntimeIdentifier=false` zapobiega dodaniu platformy laptopa do listy Android RID i błędowi locked restore. Wynik znajdziesz pod `src/DigitalSorter.AndroidTV/bin/Release/net10.0-android/`, w podkatalogu `publish/`; wybierz plik `*-Signed.aab`, a nie niepodpisany `.aab`. Parametr `file:` jest obsługiwany dla AAB; nie zamieniaj go na `env:`, które ma ograniczenia w tym formacie.
+Projekt deklaruje ARM32, ARM64 oraz x64. `UseDefaultPublishRuntimeIdentifier=false` zapobiega dodaniu platformy laptopa do listy Android RID i błędowi locked restore. Wynik znajdziesz pod `src/DigitalSorter.AndroidTV/bin/Release/net10.0-android/`, w podkatalogu `publish/`; wybierz plik `*-Signed.aab`, a nie niepodpisany `.aab`. Parametr `file:` jest obsługiwany dla AAB; nie zamieniaj go na `env:`, które ma ograniczenia w tym formacie.
 
 Przed każdym kolejnym wydaniem zwiększ `ApplicationVersion` (liczbowy versionCode) i ustaw `ApplicationDisplayVersion` w `.csproj`. Nie dodawaj `DigitalSorterTestCertificate` do publikacji; projekt odrzuca go w Release. Instalacja z Google Play jest podpisana kluczem App Signing i może wymagać usunięcia wcześniejszej wersji instalowanej przez USB z innym podpisem.
 

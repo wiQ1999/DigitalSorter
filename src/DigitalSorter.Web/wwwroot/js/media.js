@@ -2,6 +2,39 @@ let broker;
 let gallery;
 let activeMedia;
 let full = false;
+let nativeTv = false;
+const prefetched = new Map();
+const contentUrl = (id) => "/drive-content/" + encodeURIComponent(id);
+const photoUrl = (id) =>
+  full && !nativeTv
+    ? contentUrl(id)
+    : contentUrl(id) + "?preview=" + (nativeTv ? 1280 : 1920);
+
+function releaseImage(image) {
+  image.removeAttribute("src");
+  image.remove();
+}
+export function prefetchMedia(upcoming, currentId) {
+  const candidate = upcoming.find((item) => !isHeif(item.name, item.mimeType));
+  for (const [id, image] of prefetched) {
+    if (id !== candidate?.id && id !== currentId) {
+      releaseImage(image);
+      prefetched.delete(id);
+    }
+  }
+  if (!candidate || prefetched.has(candidate.id)) return;
+  const image = new Image();
+  image.decoding = "async";
+  image.fetchPriority = "low";
+  prefetched.set(candidate.id, image);
+  const start = () => {
+    if (prefetched.get(candidate.id) === image)
+      image.src = photoUrl(candidate.id);
+  };
+  if (activeMedia instanceof HTMLImageElement && !activeMedia.complete)
+    activeMedia.addEventListener("load", start, { once: true });
+  else start();
+}
 const secureRequests = new Map();
 
 export function isNativeTv() {
@@ -30,8 +63,15 @@ globalThis.digitalSorterNativeComplete = (id, value, error) => {
   else request.resolve(value);
 };
 
-export async function initialize(reference, tv, filesEndpoint) {
+export async function initialize(reference, tv, filesEndpoint, assetVersion) {
   broker = reference;
+  nativeTv = tv;
+  if (assetVersion)
+    await Promise.all(
+      [...document.querySelectorAll('link[rel="stylesheet"]')].map((link) =>
+        refreshStylesheet(link, assetVersion),
+      ),
+    );
   document.body.classList.toggle("tv", tv);
   if (!("serviceWorker" in navigator))
     throw new Error(
@@ -132,6 +172,15 @@ export function observeThumbnails(strip, reference) {
 }
 export async function fullscreen(enabled) {
   full = enabled;
+  if (
+    enabled &&
+    !nativeTv &&
+    activeMedia instanceof HTMLImageElement &&
+    activeMedia.dataset.original
+  ) {
+    activeMedia.dataset.fullResolution = "true";
+    activeMedia.src = activeMedia.dataset.original;
+  }
   if (enabled && !document.fullscreenElement) {
     try {
       await document.documentElement.requestFullscreen();
@@ -143,7 +192,7 @@ export async function fullscreen(enabled) {
 }
 function onKey(event) {
   if (event.target.matches("input,textarea,select")) return;
-  if (event.key === "Escape" || event.key === "BrowserBack") {
+  if (["Escape", "BrowserBack"].includes(event.key)) {
     if (full) {
       event.preventDefault();
       fullscreen(false);
@@ -155,14 +204,14 @@ function onKey(event) {
     event.key === "MediaPlayPause" ||
     (event.key === " " && event.target.closest(".media-stage"))
   ) {
-    if (activeMedia instanceof HTMLVideoElement) {
-      event.preventDefault();
-      activeMedia.paused
-        ? activeMedia.play().catch(() => {})
-        : activeMedia.pause();
-    }
+    toggleVideo(event);
     return;
   }
+  if (navigateMedia(event)) return;
+  if (document.body.classList.contains("tv") && event.key.startsWith("Arrow"))
+    moveFocus(event);
+}
+function navigateMedia(event) {
   const isPlayer =
     event.target === document.body || event.target.closest(".media-stage");
   if (isPlayer && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
@@ -171,10 +220,12 @@ function onKey(event) {
       "Key",
       event.key === "ArrowRight" ? "next" : "previous",
     );
-    return;
+    return true;
   }
-  if (!document.body.classList.contains("tv") || !event.key.startsWith("Arrow"))
-    return;
+  return false;
+}
+
+function moveFocus(event) {
   const items = [
     ...document.querySelectorAll(
       'button:not(:disabled),a[href],input,[tabindex="0"]',
@@ -217,7 +268,7 @@ function isHeif(name, mime) {
 
 export function fallbackThumbnail(image, id, name, mime, video) {
   const controller = new AbortController();
-  const source = "/drive-content/" + encodeURIComponent(id);
+  const source = contentUrl(id);
   let disposed = false,
     objectUrl,
     preview;
@@ -292,7 +343,10 @@ export function fallbackThumbnail(image, id, name, mime, video) {
       media.src = source;
     }
   }
-  render().catch(() => {});
+  if (nativeTv && (video || isHeif(name, mime))) {
+    image.removeAttribute("src");
+    image.alt = "Podgląd niedostępny";
+  } else render().catch(() => {});
   return {
     dispose() {
       disposed = true;
@@ -304,16 +358,169 @@ export function fallbackThumbnail(image, id, name, mime, video) {
   };
 }
 
-export async function mountMedia(stage, id, name, mime, video, reference) {
+export function mountMedia(stage, id, name, mime, video, reference) {
   const surface = stage.querySelector(".media-surface");
-  const media = document.createElement(video ? "video" : "img");
-  const canvas = document.createElement("canvas");
-  canvas.width = 48;
-  canvas.height = 32;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
+  const { media, prepared } = createMedia(id, name, video);
   let disposed = false,
-    timer,
     objectUrl;
+  activeMedia = media;
+  surface.append(media);
+  let originalFallback = false;
+  media.addEventListener("error", () => {
+    if (disposed) return;
+    if (
+      !video &&
+      !originalFallback &&
+      media.dataset.fullResolution !== "true"
+    ) {
+      originalFallback = true;
+      if (isHeif(name, mime)) void decodeHeif();
+      else media.src = contentUrl(id);
+      return;
+    }
+    describeFailure(media, video, id, controller.signal).then((message) => {
+      if (!disposed)
+        reference.invokeMethodAsync("MediaError", message).catch(() => {});
+    });
+  });
+  const ready = () => {
+    if (!disposed) reference.invokeMethodAsync("MediaReady").catch(() => {});
+  };
+  media.addEventListener(video ? "loadeddata" : "load", ready, { once: true });
+  const ambient = observeAmbient(stage, media, video, () => disposed);
+  const url = contentUrl(id);
+  const controller = new AbortController();
+  async function decodeHeif() {
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error("Unavailable");
+      const { heicTo } = await import("../vendor/heic-to.js");
+      const blob = await response.blob();
+      if (disposed) return;
+      const converted = await heicTo({
+        blob,
+        type: "image/jpeg",
+        quality: 0.92,
+      });
+      if (!disposed) {
+        objectUrl = URL.createObjectURL(converted);
+        media.src = objectUrl;
+      }
+    } catch {
+      if (!disposed)
+        await reference.invokeMethodAsync(
+          "MediaError",
+          "Nie udało się odczytać zdjęcia HEIC/HEIF. Sprawdź dostęp do pliku.",
+        );
+    }
+  }
+  originalFallback = setMediaSource(
+    media,
+    prepared,
+    id,
+    name,
+    mime,
+    video,
+    decodeHeif,
+  );
+  if (isReadyPhoto(media)) {
+    ready();
+    ambient.sample();
+  }
+  return {
+    dispose() {
+      disposed = true;
+      ambient.dispose();
+      controller.abort();
+      if (video) media.pause();
+      media.removeAttribute("src");
+      if (video) media.load();
+      media.remove();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (activeMedia === media) activeMedia = null;
+    },
+  };
+}
+export function clearMedia() {
+  for (const image of prefetched.values()) releaseImage(image);
+  prefetched.clear();
+  navigator.serviceWorker.controller?.postMessage({ type: "forget-media" });
+  if (activeMedia instanceof HTMLVideoElement) activeMedia.pause();
+  activeMedia?.removeAttribute("src");
+}
+
+async function describeFailure(media, video, id, signal) {
+  try {
+    const response = await fetch(contentUrl(id), {
+      headers: { Range: "bytes=0-0" },
+      signal,
+    });
+    await response.body?.cancel();
+    const failures = {
+      401: "Połącz ponownie konto Google, aby odtworzyć materiał.",
+      403: "Brak uprawnień do odczytu tego pliku na Google Drive.",
+      404: "Ten plik nie jest już dostępny na Google Drive.",
+      429: "Limit Google Drive został przekroczony. Spróbuj ponownie później.",
+    };
+    if (!response.ok)
+      return (
+        failures[response.status] ||
+        "Nie udało się pobrać materiału. Sprawdź połączenie i spróbuj ponownie."
+      );
+  } catch {
+    return "Pobieranie materiału zostało przerwane. Sprawdź połączenie i spróbuj ponownie.";
+  }
+  if (!video)
+    return "Nie udało się odczytać zdjęcia. Format może być nieobsługiwany lub plik uszkodzony.";
+  const messages = {
+    2: "Pobieranie filmu zostało przerwane. Sprawdź połączenie i spróbuj ponownie.",
+    3: "Nie udało się zdekodować filmu. Plik może być uszkodzony lub używać kodeka nieobsługiwanego przez to urządzenie.",
+    4: "Ten format lub kodek wideo nie jest obsługiwany przez odtwarzacz. Spróbuj wersji MP4 z wideo H.264 i dźwiękiem AAC.",
+  };
+  return messages[media.error?.code] || "Nie udało się otworzyć filmu.";
+}
+
+function refreshStylesheet(link, version) {
+  const url = new URL(link.href);
+  if (url.searchParams.get("v") === version) return Promise.resolve();
+  url.searchParams.set("v", version);
+  return new Promise((resolve, reject) => {
+    const fresh = link.cloneNode(false);
+    let timer, check;
+    const ready = () => {
+      clearTimeout(timer);
+      clearInterval(check);
+      link.remove();
+      resolve();
+    };
+    fresh.onload = ready;
+    fresh.onerror = () => {
+      clearTimeout(timer);
+      clearInterval(check);
+      reject(new Error("Nie można wczytać stylów aplikacji."));
+    };
+    fresh.href = url.href;
+    // A new link reliably emits load in older Android WebViews; replacing href on
+    // an already loaded stylesheet can leave its load event undelivered.
+    link.after(fresh);
+    check = setInterval(() => {
+      if (fresh.sheet?.cssRules.length) ready();
+    }, 50);
+    timer = setTimeout(() => (fresh.sheet ? ready() : fresh.onerror()), 10000);
+  });
+}
+
+function toggleVideo(event) {
+  if (!(activeMedia instanceof HTMLVideoElement)) return;
+  event.preventDefault();
+  if (activeMedia.paused) activeMedia.play().catch(() => {});
+  else activeMedia.pause();
+}
+
+function createMedia(id, name, video) {
+  const prepared = !video && prefetched.get(id);
+  prefetched.delete(id);
+  const media = prepared || document.createElement(video ? "video" : "img");
   media.setAttribute("aria-label", name);
   if (video) {
     media.controls = true;
@@ -322,21 +529,38 @@ export async function mountMedia(stage, id, name, mime, video, reference) {
   } else {
     media.alt = name;
     media.decoding = "async";
+    if (!nativeTv && !isHeif(name, "")) media.dataset.original = contentUrl(id);
+    if (full && !nativeTv) media.dataset.fullResolution = "true";
   }
-  activeMedia = media;
-  surface.append(media);
-  media.addEventListener("error", () => {
-    if (!disposed)
-      reference
-        .invokeMethodAsync(
-          "MediaError",
-          "Plik jest niedostępny, uszkodzony lub jego kodek nie jest obsługiwany przez to urządzenie.",
-        )
-        .catch(() => {});
-  });
+  return { media, prepared };
+}
+function isReadyPhoto(media) {
+  return (
+    media instanceof HTMLImageElement &&
+    media.complete &&
+    media.naturalWidth > 0
+  );
+}
+function setMediaSource(media, prepared, id, name, mime, video, decodeHeif) {
+  if (isHeif(name, mime) && !nativeTv) void decodeHeif();
+  else if (!prepared || !media.getAttribute("src") || (full && !nativeTv))
+    media.src = video ? contentUrl(id) : photoUrl(id);
+  else if (media.complete && !media.naturalWidth) {
+    media.src = contentUrl(id);
+    return nativeTv;
+  }
+  return false;
+}
+function observeAmbient(stage, media, video, isDisposed) {
+  if (nativeTv) return { sample() {}, dispose() {} };
+  const canvas = document.createElement("canvas");
+  canvas.width = 48;
+  canvas.height = 32;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
   const sample = () => {
     if (
-      disposed ||
+      isDisposed() ||
+      nativeTv ||
       full ||
       !(video ? media.readyState >= 2 : media.complete && media.naturalWidth)
     )
@@ -373,44 +597,6 @@ export async function mountMedia(stage, id, name, mime, video, reference) {
     }
   };
   media.addEventListener(video ? "loadeddata" : "load", sample);
-  if (video) timer = setInterval(sample, 350);
-  const url = "/drive-content/" + encodeURIComponent(id);
-  if (isHeif(name, mime)) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Unavailable");
-      const { heicTo } = await import("../vendor/heic-to.js");
-      const converted = await heicTo({
-        blob: await response.blob(),
-        type: "image/jpeg",
-        quality: 0.92,
-      });
-      if (!disposed) {
-        objectUrl = URL.createObjectURL(converted);
-        media.src = objectUrl;
-      }
-    } catch {
-      if (!disposed)
-        await reference.invokeMethodAsync(
-          "MediaError",
-          "Nie udało się odczytać zdjęcia HEIC/HEIF. Sprawdź dostęp do pliku.",
-        );
-    }
-  } else media.src = url;
-  return {
-    dispose() {
-      disposed = true;
-      clearInterval(timer);
-      if (video) media.pause();
-      media.removeAttribute("src");
-      if (video) media.load();
-      media.remove();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      if (activeMedia === media) activeMedia = null;
-    },
-  };
-}
-export function clearMedia() {
-  if (activeMedia instanceof HTMLVideoElement) activeMedia.pause();
-  activeMedia?.removeAttribute("src");
+  const timer = video ? setInterval(sample, 350) : undefined;
+  return { sample, dispose: () => clearInterval(timer) };
 }

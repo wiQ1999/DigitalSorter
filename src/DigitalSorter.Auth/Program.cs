@@ -21,11 +21,10 @@ builder.WebHost.UseStaticWebAssets();
 var google = builder.Configuration.GetSection("Google").Get<GoogleOptions>() ?? new();
 var dataDirectory = Path.GetFullPath(builder.Configuration["Broker:DataDirectory"] ?? Path.Combine(builder.Environment.ContentRootPath, "data"));
 Directory.CreateDirectory(dataDirectory);
-var publicOrigin = builder.Configuration["Broker:PublicOrigin"] ?? "https://localhost:7043";
-if (!Uri.TryCreate(publicOrigin, UriKind.Absolute, out var origin) || origin.Scheme != "https" || origin.AbsolutePath != "/" ||
-    !string.IsNullOrEmpty(origin.Query) || !string.IsNullOrEmpty(origin.Fragment) || !string.IsNullOrEmpty(origin.UserInfo))
-    throw new InvalidOperationException("Broker:PublicOrigin must be an HTTPS origin without a path.");
-builder.Configuration["Broker:PublicOrigin"] = origin.GetLeftPart(UriPartial.Authority);
+var publicOrigin = BrokerOrigins.Validate(builder.Configuration["Broker:PublicOrigin"] ?? "https://localhost:7043", "Broker:PublicOrigin");
+builder.Configuration["Broker:PublicOrigin"] = publicOrigin;
+var pairingOrigin = BrokerOrigins.Validate(BrokerOrigins.Pairing(builder.Configuration), "Broker:PairingOrigin");
+builder.Configuration["Broker:PairingOrigin"] = pairingOrigin;
 var encryptionKey = builder.Configuration["Broker:TokenEncryptionKey"];
 if (string.IsNullOrEmpty(encryptionKey))
 {
@@ -173,7 +172,7 @@ app.Use(async (c, next) =>
 app.UseBlazorFrameworkFiles();
 app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = c =>
 {
-    if (c.File.Name == "media-worker.js") c.Context.Response.Headers.CacheControl = "no-cache";
+    if (Path.GetExtension(c.File.Name) is ".js" or ".css" or ".html") c.Context.Response.Headers.CacheControl = "no-cache";
 }});
 app.UseRouting();
 app.UseRateLimiter();
@@ -181,8 +180,11 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", googleConfigured = google.Configured }));
+var assetVersion = WebAssets.Revision(app.Environment.WebRootFileProvider);
 app.MapGet("/api/client-config", () => Results.Ok(new
 {
+    AssetVersion = assetVersion,
+    LoginOrigin = publicOrigin,
     DriveFilesEndpoint = app.Environment.IsEnvironment("Testing")
         ? builder.Configuration["Testing:DriveFilesEndpoint"] ?? "https://www.googleapis.com/drive/v3/files"
         : "https://www.googleapis.com/drive/v3/files"
@@ -216,7 +218,7 @@ app.MapGet("/api/pair/details", async (string code, PairingService pairs, Cancel
     await pairs.DetailsAsync(code, ct) is { } details ? Results.Ok(details) : Results.NotFound()).RequireAuthorization().RequireRateLimiting("pair-confirm");
 app.MapGet("/api/pair/qr", (string uri) =>
 {
-    if (!uri.StartsWith(publicOrigin.TrimEnd('/') + "/pair?code=", StringComparison.Ordinal) || uri.Length > 512) return Results.BadRequest();
+    if (!uri.StartsWith(pairingOrigin + "/pair?code=", StringComparison.Ordinal) || uri.Length > 512) return Results.BadRequest();
     using var data = QRCodeGenerator.GenerateQrCode(uri, QRCodeGenerator.ECCLevel.M);
     return Results.Text(new SvgQRCode(data).GetGraphic(8), "image/svg+xml");
 }).RequireRateLimiting("pair-poll");

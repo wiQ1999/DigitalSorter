@@ -17,7 +17,12 @@
             <label for="pair-code">Kod parowania</label>
             <input id="pair-code" @bind="_code" @bind:event="oninput" @bind:after="ClearDetails" maxlength="12" autocomplete="off" inputmode="text" placeholder="ABCD-EFGH" />
             @if (!Broker.Session.Authenticated || Reauthorize)
-            { <a class="button primary" href="@LoginUrl">Połącz konto Google</a> }
+            {
+                @if (LoginOnLaptop)
+                { <p class="local-pair-help">Ta lokalna instancja loguje Google na laptopie. Otwórz <strong>@Broker.LoginOrigin/pair</strong> na laptopie i wpisz powyższy kod, aby zatwierdzić telewizor.</p> }
+                else
+                { <a class="button primary" href="@LoginUrl">Połącz konto Google</a> }
+            }
             else
             {
                 <button class="button" @onclick="Check">Sprawdź urządzenie</button>
@@ -36,7 +41,8 @@
     private string? _error;
     private PairingDetails? _details;
     private bool Reauthorize => _consent || Broker.Session.GoogleAuthorizationRequired;
-    private string LoginUrl => "/auth/login?" + (Reauthorize ? "consent=true&" : "") + "returnUrl=" + Uri.EscapeDataString("/pair?code=" + Uri.EscapeDataString(_code));
+    private bool LoginOnLaptop => Uri.TryCreate(Broker.LoginOrigin, UriKind.Absolute, out var origin) && origin.IsLoopback && !new Uri(Navigation.Uri).IsLoopback;
+    private string LoginUrl => Broker.LoginUrl("/pair?code=" + Uri.EscapeDataString(_code), Reauthorize);
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;

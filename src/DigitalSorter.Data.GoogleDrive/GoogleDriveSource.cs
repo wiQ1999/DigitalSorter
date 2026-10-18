@@ -46,7 +46,14 @@ public sealed class GoogleDriveSource(HttpClient http, IAccessTokenProvider toke
     {
         cancellationToken.ThrowIfCancellationRequested();
         progress?.Report(new(0, null));
-        var candidates = new List<(MediaAsset Asset, long? Size)>();
+        var candidates = await DiscoverAsync(folderIds, cancellationToken);
+        progress?.Report(new(0, candidates.Count));
+        return await ReadMetadataAsync(candidates, cancellationToken, progress);
+    }
+
+    private async Task<List<MediaAsset>> DiscoverAsync(IEnumerable<string> folderIds, CancellationToken cancellationToken)
+    {
+        var candidates = new List<MediaAsset>();
         var pending = new Queue<string>(folderIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.Ordinal));
         var visited = new HashSet<string>(StringComparer.Ordinal);
         var seenFiles = new HashSet<string>(StringComparer.Ordinal);
@@ -60,34 +67,64 @@ public sealed class GoogleDriveSource(HttpClient http, IAccessTokenProvider toke
                 var id = file.GetProperty("id").GetString()!;
                 var mime = file.GetProperty("mimeType").GetString()!;
                 if (mime == FolderMime) { pending.Enqueue(id); continue; }
-                var name = file.GetProperty("name").GetString()!;
-                if (MediaFormats.GetKind(name) is not { } kind || !seenFiles.Add(id)) continue;
-                var available = !file.TryGetProperty("capabilities", out var capabilities) ||
-                    !capabilities.TryGetProperty("canDownload", out var canDownload) || canDownload.GetBoolean();
-                DateTimeOffset? captured = null;
-                if (file.TryGetProperty("imageMediaMetadata", out var image) && image.TryGetProperty("time", out var time)) captured = CaptureDate.Parse(time.GetString());
-                var size = file.TryGetProperty("size", out var sizeJson) && long.TryParse(sizeJson.GetString(), out var parsedSize) ? parsedSize : (long?)null;
-                candidates.Add((new(id, name, mime, kind, captured, folder, available), size));
+                if (seenFiles.Add(id) && ParseAsset(file, folder) is { } asset) candidates.Add(asset);
             }
         }
-        progress?.Report(new(0, candidates.Count));
-        var result = new List<MediaAsset>(candidates.Count);
-        foreach (var (candidate, size) in candidates)
+        return candidates;
+    }
+
+    private static MediaAsset? ParseAsset(JsonElement file, string folder)
+    {
+        var id = file.GetProperty("id").GetString()!;
+        var mime = file.GetProperty("mimeType").GetString()!;
+        var name = file.GetProperty("name").GetString()!;
+        if (MediaFormats.GetKind(name) is not { } kind) return null;
+        var available = !file.TryGetProperty("capabilities", out var capabilities) ||
+            !capabilities.TryGetProperty("canDownload", out var canDownload) || canDownload.GetBoolean();
+        DateTimeOffset? captured = null;
+        if (file.TryGetProperty("imageMediaMetadata", out var image) && image.TryGetProperty("time", out var time)) captured = CaptureDate.Parse(time.GetString());
+        var size = file.TryGetProperty("size", out var sizeJson) && long.TryParse(sizeJson.GetString(), out var parsedSize) ? parsedSize : (long?)null;
+        return new(id, name, mime, kind, captured, folder, available, size);
+    }
+
+    private async Task<IReadOnlyList<MediaAsset>> ReadMetadataAsync(IReadOnlyList<MediaAsset> candidates, CancellationToken cancellationToken,
+        IProgress<MediaReadProgress>? progress)
+    {
+        var result = new MediaAsset[candidates.Count];
+        var next = -1;
+        var processed = 0;
+        var progressGate = new object();
+        using var operation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        async Task Worker()
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var asset = candidate;
-            if (asset.CapturedAt is null && asset.IsAvailable)
+            try
             {
-                try { asset = asset with { CapturedAt = await CaptureMetadata.ReadAsync(asset.Name,
-                    (offset, length, ct) => ReadRangeAsync(asset.Id, offset, length, ct), cancellationToken, size) }; }
-                catch (DriveException ex) when (ex.Reason is DriveFailure.Permission or DriveFailure.Missing)
-                { asset = asset with { IsAvailable = false }; }
+                while (Interlocked.Increment(ref next) is var index && index < candidates.Count)
+                {
+                    operation.Token.ThrowIfCancellationRequested();
+                    var candidate = candidates[index];
+                    result[index] = await ReadCandidate(candidate, candidate.Size, operation.Token);
+                    operation.Token.ThrowIfCancellationRequested();
+                    lock (progressGate) progress?.Report(new(++processed, candidates.Count));
+                }
             }
-            cancellationToken.ThrowIfCancellationRequested();
-            result.Add(asset);
-            progress?.Report(new(result.Count, candidates.Count));
+            catch { await operation.CancelAsync(); throw; }
         }
+        await Task.WhenAll(Enumerable.Range(0, Math.Min(3, candidates.Count)).Select(_ => Worker()));
         return result;
+    }
+
+    private async Task<MediaAsset> ReadCandidate(MediaAsset asset, long? size, CancellationToken ct)
+    {
+        if (asset.CapturedAt is not null || !asset.IsAvailable) return asset;
+        try
+        {
+            var date = await CaptureMetadata.ReadAsync(asset.Name,
+                (offset, length, token) => ReadRangeAsync(asset.Id, offset, length, token), ct, size);
+            return asset with { CapturedAt = date };
+        }
+        catch (DriveException ex) when (ex.Reason is DriveFailure.Permission or DriveFailure.Missing)
+        { return asset with { IsAvailable = false }; }
     }
 
     private async Task<List<JsonElement>> ListAsync(string query, CancellationToken ct)

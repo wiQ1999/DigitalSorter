@@ -29,4 +29,4 @@ for attempt in {1..60}; do
   sleep 1
 done
 if [[ "$ready" != true ]]; then cat test-results/browser-host.log; exit 1; fi
-node --test --test-concurrency=1 tests/browser/gallery.spec.mjs
+node --test --test-concurrency=1 tests/browser/gallery.spec.mjs tests/browser/media-worker.spec.mjs

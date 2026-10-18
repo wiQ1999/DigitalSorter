@@ -101,18 +101,40 @@ test(
       );
     }
     try {
-      await device.shell(`pm clear ${app}`);
+      if (!process.env.TEST_KEEP_TV_DATA) await device.shell(`pm clear ${app}`);
+      await device.shell(`am force-stop ${app}`);
       await launch();
-      console.log("Configuring the server through the native Android screen");
-      await tapNativeControl("broker-origin");
-      await adb("shell", "input", "text", "https://10.0.2.2:7443");
-      await device.shell("input keyevent KEYCODE_ESCAPE");
-      await tapNativeControl("open-broker");
+      if (!process.env.TEST_KEEP_TV_DATA) {
+        console.log("Configuring the server through the native Android screen");
+        await tapNativeControl("broker-origin");
+        await adb(
+          "shell",
+          "input",
+          "text",
+          process.env.TEST_TV_ORIGIN ?? "https://10.0.2.2:7443",
+        );
+        await device.shell("input keyevent KEYCODE_ESCAPE");
+        await tapNativeControl("open-broker");
+      }
       page = await attach();
       console.log("Approving the TV from the controlled phone browser");
       await page.getByRole("button", { name: "Połącz przez telefon" }).click();
       const code = (await page.locator(".pair-code").innerText()).trim();
       assert.match(code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+      assert.equal(
+        await page.evaluate(() => {
+          const qr = document
+            .querySelector(".tv-pairing")
+            .getBoundingClientRect();
+          return (
+            document.documentElement.scrollHeight <= innerHeight &&
+            qr.top >= 0 &&
+            qr.bottom <= innerHeight
+          );
+        }),
+        true,
+        "Native pairing fits the physical TV viewport",
+      );
       const phone = await browser.newPage();
       await phone.goto(process.env.TEST_ORIGIN + "/pair?code=" + code);
       await phone.getByRole("link", { name: "Połącz konto Google" }).click();
@@ -150,7 +172,7 @@ test(
         await page.getByRole("checkbox").first().check();
         await page.getByRole("button", { name: "Otwórz kolekcję" }).click();
         await page
-          .getByText("Odczytano 8 z 10 materiałów.", { exact: true })
+          .getByText("Odczytano 9 z 10 materiałów.", { exact: true })
           .waitFor();
         await page.waitForFunction(() => {
           const bounds = document
@@ -172,11 +194,26 @@ test(
         const images = [...document.querySelectorAll(".thumbnail img")];
         return (
           images.length > 0 &&
-          images.every((image) => image.complete && image.naturalWidth > 0)
+          images.every(
+            (image) =>
+              (image.complete && image.naturalWidth > 0) ||
+              image.alt === "Podgląd niedostępny",
+          )
         );
       });
       console.log(
-        "Native photo and video previews work without Drive thumbnail links",
+        "Native photos have previews; expensive video/HEIF fallbacks use placeholders when Drive has no thumbnail",
+      );
+      assert.equal(
+        await page
+          .locator(".thumbnail img:not([src])")
+          .evaluateAll((images) =>
+            images.every(
+              (image) => getComputedStyle(image).visibility === "hidden",
+            ),
+          ),
+        true,
+        "Unavailable previews must not display a broken image icon",
       );
       await thumbnailsFit(page, 8);
       assert.equal(

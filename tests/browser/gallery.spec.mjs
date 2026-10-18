@@ -141,7 +141,7 @@ test(
         );
         await discover();
         await page
-          .getByText("Odczytano 8 z 10 materiałów.", { exact: true })
+          .getByText("Odczytano 9 z 10 materiałów.", { exact: true })
           .waitFor();
         assert.equal(
           await page.locator(".metadata-progress progress").getAttribute("max"),
@@ -151,7 +151,7 @@ test(
           await page
             .locator(".metadata-progress progress")
             .getAttribute("value"),
-          "8",
+          "9",
         );
         await page.screenshot({
           path: "test-results/metadata-progress.png",
@@ -187,7 +187,7 @@ test(
           await (
             match === collectionRequest
               ? page.getByText("Wyszukuję materiały…", { exact: true })
-              : page.getByText("Odczytano 8 z 10 materiałów.", { exact: true })
+              : page.getByText("Odczytano 9 z 10 materiałów.", { exact: true })
           ).waitFor();
           await page.getByRole("button", { name: "Anuluj odczyt" }).click();
           await page
@@ -499,6 +499,12 @@ test(
         .getByRole("button", { name: "Pełny ekran", exact: true })
         .click();
       await page.waitForSelector(".app-shell.fullscreen");
+      await imageReady(page);
+      assert.ok(
+        !(
+          await page.locator(".media-surface img").getAttribute("src")
+        ).includes("preview="),
+      );
       assert.equal(
         await page
           .locator(".ambient")
@@ -511,6 +517,12 @@ test(
         () =>
           document.querySelector(".media-caption strong")?.textContent ===
           "Wybrzeże.png",
+      );
+      await imageReady(page);
+      assert.ok(
+        !(
+          await page.locator(".media-surface img").getAttribute("src")
+        ).includes("preview="),
       );
       await page.keyboard.press("Escape");
       await page.waitForSelector(".app-shell:not(.fullscreen)");
@@ -647,6 +659,33 @@ test(
       await tvPage
         .getByRole("button", { name: "Połącz przez telefon" })
         .click();
+      await tvPage.locator(".tv-pairing img").waitFor();
+      for (const viewport of [
+        { width: 960, height: 540 },
+        { width: 1280, height: 720 },
+        { width: 1920, height: 1080 },
+      ]) {
+        await tvPage.setViewportSize(viewport);
+        assert.equal(
+          await tvPage.evaluate(() => {
+            const card = document
+              .querySelector(".tv-pairing")
+              .getBoundingClientRect();
+            const qr = document
+              .querySelector(".tv-pairing img")
+              .getBoundingClientRect();
+            return (
+              document.documentElement.scrollHeight <= innerHeight &&
+              card.top >= 0 &&
+              card.bottom <= innerHeight &&
+              qr.width >= 128 &&
+              qr.height === qr.width
+            );
+          }),
+          true,
+          "Pairing and QR fit the complete TV viewport",
+        );
+      }
       const code = (await tvPage.locator(".pair-code").innerText()).trim();
       assert.match(code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
       await tvPage.screenshot({
@@ -690,7 +729,7 @@ test(
         await tvPage.getByRole("checkbox").first().check();
         await tvPage.getByRole("button", { name: "Otwórz kolekcję" }).click();
         await tvPage
-          .getByText("Odczytano 8 z 10 materiałów.", { exact: true })
+          .getByText("Odczytano 9 z 10 materiałów.", { exact: true })
           .waitFor();
         await tvPage.waitForFunction(() => {
           const bounds = document
@@ -907,5 +946,119 @@ test(
       await tv.ctx.close();
       await phone.ctx.close();
     }
+  },
+);
+
+test(
+  "Web: one prepared photo is reused and loading feedback ends after display",
+  { timeout: 90000 },
+  async () => {
+    await checked("photo-prefetch-reuse", async (page) => {
+      await page.goto(origin);
+      const baseline = await page.evaluate(
+        async () =>
+          (await (await fetch("/test-drive/stats")).json())["preview-coast"] ??
+          0,
+      );
+      await login(page);
+      await load(page);
+      await page.waitForFunction(async (baseline) => {
+        const stats = await (await fetch("/test-drive/stats")).json();
+        return (stats["preview-coast"] ?? 0) > baseline;
+      }, baseline);
+      await next(page);
+      await imageReady(page);
+      assert.equal(
+        await page.evaluate(
+          async (baseline) =>
+            (await (await fetch("/test-drive/stats")).json())["preview-coast"] -
+            baseline,
+          baseline,
+        ),
+        1,
+        "Navigating to the prepared photo must not fetch it a second time",
+      );
+      assert.equal(await page.locator(".media-loading").count(), 0);
+    });
+  },
+);
+
+test(
+  "TV: startup replaces styles from a previous deployment",
+  { timeout: 90000 },
+  async () => {
+    const fixture = await context(true, { width: 960, height: 540 });
+    try {
+      await fixture.ctx.route(
+        (url) => url.pathname === "/css/app.css" && !url.searchParams.has("v"),
+        (route) =>
+          route.fulfill({
+            contentType: "text/css",
+            body: ".app-shell{min-height:1200px}",
+          }),
+      );
+      const page = await fixture.ctx.newPage();
+      await page.goto(origin);
+      await page
+        .getByRole("button", { name: "Połącz przez telefon", exact: true })
+        .click();
+      await page.locator(".pair-code").waitFor();
+      assert.equal(
+        await page.evaluate(() => {
+          const qr = document
+            .querySelector(".tv-pairing")
+            .getBoundingClientRect();
+          return (
+            document.documentElement.scrollHeight <= innerHeight &&
+            qr.bottom <= innerHeight
+          );
+        }),
+        true,
+      );
+      assert.deepEqual(fixture.errors, []);
+    } finally {
+      await fixture.ctx.close();
+    }
+  },
+);
+
+test(
+  "Web: video download failures are distinguished from unsupported codecs",
+  { timeout: 120000 },
+  async () => {
+    await checked("video-http-errors", async (page) => {
+      await login(page);
+      await load(page);
+      try {
+        for (const [status, expected] of [
+          [403, "Brak uprawnień do odczytu tego pliku na Google Drive."],
+          [404, "Ten plik nie jest już dostępny na Google Drive."],
+        ]) {
+          await page.evaluate(async (status) => {
+            await fetch("/test-drive/control", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ mediaStatus: status }),
+            });
+          }, status);
+          await next(page, 5);
+          await page.getByText(expected, { exact: true }).waitFor();
+          assert.equal(await page.locator(".media-loading").count(), 0);
+          await page.getByRole("tab", { name: "Bez poprawnej daty" }).click();
+          await page
+            .getByRole("tab", { name: "Chronologicznie", exact: true })
+            .click();
+          await imageReady(page);
+        }
+      } finally {
+        await page.evaluate(async () => {
+          await fetch("/test-drive/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mediaStatus: null }),
+          });
+        });
+      }
+    });
   },
 );
