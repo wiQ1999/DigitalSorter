@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using QRCoder;
 
@@ -47,7 +46,7 @@ builder.Services.AddSingleton(new SecretCipher(key));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AccountLocks>();
 builder.Services.AddMemoryCache();
-builder.Services.AddDbContext<BrokerDb>(o => o.UseSqlite("Data Source=" + Path.Combine(dataDirectory, "broker.db")));
+builder.Services.AddSqliteBrokerStorage(builder.Configuration, dataDirectory);
 builder.Services.AddDataProtection().SetApplicationName("DigitalSorter").PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataDirectory, "keys")));
 builder.Services.AddOptions<KeyManagementOptions>().Configure<SecretCipher>((o, c) => o.XmlEncryptor = new KeyRingEncryptor(c));
 builder.Services.AddScoped<GoogleTokens>();
@@ -85,10 +84,10 @@ builder.Services.AddAuthentication(o =>
     o.Events.OnRedirectToAccessDenied = c => { c.Response.StatusCode = 403; return Task.CompletedTask; };
     o.Events.OnValidatePrincipal = async c =>
     {
-        var db = c.HttpContext.RequestServices.GetRequiredService<BrokerDb>();
+        var store = c.HttpContext.RequestServices.GetRequiredService<IBrokerStore>();
         var now = c.HttpContext.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
         var id = c.Principal?.FindFirstValue("ds_session");
-        if (!await db.Sessions.AnyAsync(x => x.Id == id && x.Kind == "web" && x.ExpiresAt > now, c.HttpContext.RequestAborted)) c.RejectPrincipal();
+        if (!await store.HasWebSessionAsync(id, now, c.HttpContext.RequestAborted)) c.RejectPrincipal();
     };
 }).AddOpenIdConnect("Google", o =>
 {
@@ -128,10 +127,10 @@ builder.Services.AddAuthentication(o =>
         }
         catch (GoogleAuthorizationRequiredException)
         { c.Response.Redirect(FailureRedirect(c.ReturnUri, "consent")); c.HandleResponse(); return; }
-        var db = c.HttpContext.RequestServices.GetRequiredService<BrokerDb>();
+        var store = c.HttpContext.RequestServices.GetRequiredService<IBrokerStore>();
         var session = new BrokerSession { Id = SecretCipher.RandomSecret(), Subject = subject,
             ExpiresAt = c.HttpContext.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().AddDays(30) };
-        db.Sessions.Add(session); await db.SaveChangesAsync(ct);
+        await store.AddSessionAsync(session, ct);
         c.Principal = new(new ClaimsIdentity([new("sub", subject), new("ds_session", session.Id),
             new(ClaimTypes.Name, principal.FindFirstValue("name") ?? "Konto Google")], "Web"));
         c.Properties.StoreTokens([]);
@@ -155,7 +154,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 
 var app = builder.Build();
 await using (var scope = app.Services.CreateAsyncScope())
-    await scope.ServiceProvider.GetRequiredService<BrokerDb>().Database.EnsureCreatedAsync();
+    await scope.ServiceProvider.GetRequiredService<IBrokerStoreInitializer>().InitializeAsync();
 app.UseForwardedHeaders();
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.UseExceptionHandler();
@@ -197,13 +196,13 @@ app.MapGet("/auth/login", (HttpContext c, string? returnUrl, bool? consent) =>
     if (consent == true) props.Items["consent"] = "true";
     return Results.Challenge(props, ["Google"]);
 }).RequireRateLimiting("login");
-app.MapGet("/api/session", async (HttpContext c, IAntiforgery csrf, BrokerDb db, CancellationToken ct) =>
+app.MapGet("/api/session", async (HttpContext c, IAntiforgery csrf, IBrokerStore store, CancellationToken ct) =>
 {
     c.Response.Headers.CacheControl = "no-cache, no-store";
     c.Response.Headers.Pragma = "no-cache";
     var authenticated = c.User.Identity?.IsAuthenticated == true;
     var subject = c.User.FindFirstValue("sub");
-    var reauthorize = authenticated && !await db.Accounts.AnyAsync(x => x.Subject == subject && !x.NeedsAuthorization && x.ClientId == google.ClientId, ct);
+    var reauthorize = authenticated && !await store.HasAuthorizedAccountAsync(subject, google.ClientId, ct);
     return Results.Ok(new SessionInfo(authenticated, c.User.Identity?.Name, c.User.Identity?.AuthenticationType == "Device",
         csrf.GetAndStoreTokens(c).RequestToken, reauthorize));
 });
@@ -241,10 +240,10 @@ secured.MapPost("/pair/confirm", async (PairingConfirmation request, HttpContext
     await tokens.GetAsync(subject, ct, force: true);
     return await pairs.ApproveAsync(request.Code, subject, ct) ? Results.Ok() : Results.Conflict();
 }).RequireRateLimiting("pair-confirm");
-secured.MapPost("/logout", async (HttpContext c, BrokerDb db, CancellationToken ct) =>
+secured.MapPost("/logout", async (HttpContext c, IBrokerStore store, CancellationToken ct) =>
 {
     var id = c.User.FindFirstValue("ds_session");
-    await db.Sessions.Where(x => x.Id == id).ExecuteDeleteAsync(ct);
+    await store.DeleteSessionAsync(id, ct);
     if (c.User.Identity?.AuthenticationType != "Device") await c.SignOutAsync("Web");
     return Results.NoContent();
 });
