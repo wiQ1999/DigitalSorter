@@ -1,13 +1,12 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace DigitalSorter.Auth;
 
 public sealed class DeviceAuthentication(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger,
-    UrlEncoder encoder, BrokerDb db, TimeProvider clock) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+    UrlEncoder encoder, IBrokerStore store, TimeProvider clock) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -17,9 +16,9 @@ public sealed class DeviceAuthentication(IOptionsMonitor<AuthenticationSchemeOpt
         if (token.Length != 64) return AuthenticateResult.Fail("Invalid device credential.");
         var hash = SecretCipher.Hash(token);
         var now = clock.GetUtcNow();
-        var session = await db.Sessions.AsNoTracking().SingleOrDefaultAsync(x => x.SecretHash == hash && x.Kind == "device" && x.ExpiresAt > now, Context.RequestAborted);
+        var session = await store.FindDeviceSessionAsync(hash, now, Context.RequestAborted);
         if (session is null) return AuthenticateResult.Fail("Expired device session.");
-        var account = await db.Accounts.AsNoTracking().SingleOrDefaultAsync(x => x.Subject == session.Subject, Context.RequestAborted);
+        var account = await store.FindAccountAsync(session.Subject, Context.RequestAborted);
         if (account is null) return AuthenticateResult.Fail("Disconnected account.");
         var principal = new ClaimsPrincipal(new ClaimsIdentity([
             new("sub", session.Subject), new("ds_session", session.Id), new(ClaimTypes.Name, account.Name)

@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Linq;
 using Microsoft.AspNetCore.DataProtection.XmlEncryption;
-using Microsoft.EntityFrameworkCore;
 
 namespace DigitalSorter.Auth;
 
@@ -34,25 +33,6 @@ public sealed class Pairing
     public string Status { get; set; } = "pending";
     public string? Subject { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
-}
-
-public sealed class BrokerDb(DbContextOptions<BrokerDb> options) : DbContext(options)
-{
-    public DbSet<GoogleAccount> Accounts => Set<GoogleAccount>();
-    public DbSet<BrokerSession> Sessions => Set<BrokerSession>();
-    public DbSet<Pairing> Pairings => Set<Pairing>();
-    protected override void OnModelCreating(ModelBuilder model)
-    {
-        model.Entity<GoogleAccount>().HasKey(x => x.Subject);
-        model.Entity<BrokerSession>().HasKey(x => x.Id);
-        model.Entity<BrokerSession>().HasIndex(x => x.SecretHash).IsUnique();
-        model.Entity<BrokerSession>().HasIndex(x => x.Subject);
-        model.Entity<Pairing>().HasKey(x => x.Id);
-        model.Entity<Pairing>().HasIndex(x => x.CodeHash).IsUnique();
-        // SQLite compares UTC ticks consistently, including expiry predicates.
-        model.Entity<BrokerSession>().Property(x => x.ExpiresAt).HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
-        model.Entity<Pairing>().Property(x => x.ExpiresAt).HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
-    }
 }
 
 public sealed class SecretCipher(byte[] key)
