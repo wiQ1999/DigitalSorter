@@ -34,6 +34,18 @@
 - Odświeżanie dostępu nie wymaga ponownej zgody, dopóki autoryzacja Google pozostaje ważna; brak nowego `refresh_token` w odpowiedzi nie usuwa zapisanego tokenu.
 - Utrata autoryzacji Google wymaga ponownego połączenia konta. Wylogowanie klienta unieważnia tylko jego sesję; odłączenie Google cofa zgodę i usuwa poświadczenia oraz sesje powiązanych klientów.
 
+## Magazyn danych brokera
+
+Decyzja przyjęta 18.10.2026: serwisy OAuth, uwierzytelnianie i endpointy korzystają z `IBrokerStore`, a uruchomienie aplikacji z `IBrokerStoreInitializer`. Kontrakty nie udostępniają `DbContext`, `DbSet` ani `IQueryable`. Zapytania, zapis i transakcje są zamknięte w `DigitalSorter.Auth/Persistence`; obecna implementacja to `EfBrokerStore` z modelem `BrokerDb`.
+
+SQLite pozostaje domyślnym silnikiem. Bez dodatkowej konfiguracji aplikacja otwiera dotychczasowy plik `Broker:DataDirectory/broker.db`. Nazwy tabel, kolumn i indeksów oraz zapis dat jako liczby ticków UTC pozostają zgodne z istniejącą bazą; nie jest potrzebne przenoszenie danych. Opcjonalny `ConnectionStrings:Broker` (`ConnectionStrings__Broker` w środowisku) zastępuje wyłącznie connection string SQLite. `Broker:DataDirectory` nadal zawiera zaszyfrowane klucze sesji i lokalny klucz deweloperski.
+
+Zmiana silnika po wybraniu hostingu wymaga dodania zgodnego z EF Core providera i zastąpienia w `Program.cs` rejestracji `AddSqliteBrokerStorage(...)` rejestracją `AddRelationalBrokerStorage(options => options.Use...(...))` z konfiguracją nowego providera. Nie wymaga zmian w logice OAuth, sesji, parowania ani klientach. Alternatywny magazyn może również zastąpić oba interfejsy przez DI bez używania EF. Pozostawienie dostępu bezpośrednio przez EF w serwisach byłoby prostsze, ale wiązałoby je z jego operacjami zapisu i transakcji; wybrany kontrakt zamyka te zależności w jednym miejscu.
+
+`EfBrokerStoreInitializer` zachowuje dotychczasowe `EnsureCreatedAsync`. To tworzenie brakującego schematu, a nie mechanizm aktualizacji istniejącej bazy. Przy wdrażaniu innego silnika trzeba przygotować i zweryfikować jego schemat, migracje oraz osobne przeniesienie danych. Strategię inicjalizacji lub migracji można podmienić przez `IBrokerStoreInitializer`. Aktualnie projekt nie zawiera konfiguracji ani migracji dla nieustalonego jeszcze silnika hostingu.
+
+`TryConsumePairingAsync` obejmuje jedną transakcją warunkową zmianę parowania z `approved` na `consumed` i utworzenie sesji. Każda przyszła implementacja musi zachować jednokrotność odbioru oraz wycofanie zmiany statusu przy błędzie zapisu sesji. Testy obejmują równoległy odbiór, błąd zapisu i ponowną próbę, granice ważności w UTC, wcześniejszy schemat SQLite i pełny przepływ HTTP z testowym magazynem bez EF/SQLite. Nowy provider wymaga uruchomienia testów integracyjnych również na docelowym silniku.
+
 ## Android TV — parowanie przez telefon
 
 - Aplikacja MAUI hostuje wspólny interfejs `DigitalSorter.Web` w WebView; adapter natywny zapewnia `SecureStorage`, konfigurację serwera i obsługę Wstecz. Logowanie Google odbywa się na telefonie.

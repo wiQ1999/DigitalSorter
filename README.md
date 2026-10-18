@@ -37,12 +37,13 @@ Konfiguracja przez zmienne środowiskowe lub magazyn sekretów:
 | `Broker__PairingOrigin` | Opcjonalny adres HTTPS kodu QR, np. adres LAN laptopa; domyślnie PublicOrigin |
 | `Broker__TokenEncryptionKey` | Stały klucz AES, 32 bajty w Base64; wymagany w produkcji |
 | `Broker__DataDirectory` | Trwały katalog SQLite i zaszyfrowanych kluczy sesji |
+| `ConnectionStrings__Broker` | Opcjonalny connection string SQLite; domyślnie `broker.db` w `Broker__DataDirectory` |
 | `AllowedHosts` | Dozwolona nazwa hosta |
 | `Broker__KnownProxies__0` | Adres zaufanego reverse proxy, jeśli jest używane |
 
 W Google Cloud włącz Drive API, zakresy `openid` i `drive.readonly` oraz callback `<PublicOrigin>/auth/callback`. Status Testing Google ogranicza trwałość tokenów Drive do siedmiu dni. Publiczna aplikacja wymaga weryfikacji zakresu restricted.
 
-W Development aplikacja tworzy lokalny klucz szyfrowania. W produkcji podaj klucz z magazynu sekretów i zachowuj go wraz z backupem danych. Utrata klucza uniemożliwia odszyfrowanie poświadczeń. Backend używa SQLite i jest wdrażany jako jedna instancja.
+W Development aplikacja tworzy lokalny klucz szyfrowania. W produkcji podaj klucz z magazynu sekretów i zachowuj go wraz z backupem danych. Utrata klucza uniemożliwia odszyfrowanie poświadczeń. Backend używa SQLite i jest wdrażany jako jedna instancja. Magazyn brokera można podmienić przez DI; sposób późniejszego podłączenia innego silnika opisuje [architektura](docs/ARCHITECTURE.md#magazyn-danych-brokera).
 
 ## Android TV
 
