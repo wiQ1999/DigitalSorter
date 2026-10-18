@@ -1,5 +1,7 @@
 # Weryfikacja Web i Android TV — 18.10.2026
 
+Raport historyczny z konkretnej weryfikacji. Podane wyniki nie potwierdzają działania późniejszych zmian. Bieżący sposób uruchamiania zestawów opisuje [dokumentacja testowania](TESTING.md).
+
 ## Środowisko i zakres
 
 Windows, .NET SDK 10.0.402, Chrome, rzeczywisty Google Drive oraz Philips 55POS9002/12 (TPM171E), Android 8/API 26, ARM32, WebView 138.0.7204.179. WebView ma obszar 960×540 CSS px przy obrazie TV 1920×1080. Testy automatyczne używają oddzielnego hosta i syntetycznych danych; sprawdzenia rzeczywistego Dysku wykonano osobno.
@@ -18,8 +20,6 @@ Windows, .NET SDK 10.0.402, Chrome, rzeczywisty Google Drive oraz Philips 55POS9
 Razem 164 testy. Scenariusz natywny sprawdza start APK, QR, zatwierdzenie, SecureStorage po restarcie procesu, zdjęcia/HEIF, MP4/WebM/MOV, pilot, pełny ekran, Wstecz, fokus modalnego potwierdzenia i wylogowanie. Układ parowania sprawdzono również w przeglądarce przy 960×540, 1280×720 i 1920×1080. Nie uruchamiano lokalnie CI z emulatorem; test natywny wykonano na fizycznym TV. Obecność ABI w pakiecie nie zastępuje testów fizycznych urządzeń ARM64/x64.
 
 Kolejne poprawki obejmują przezroczyste kontrolki nad całą powierzchnią zdjęcia/filmu, pełną wysokość odtwarzacza w pełnym ekranie oraz wspólny znak Web/ikony MAUI/ekranu startowego i nowy kafelek launchera w APK 0.8.1. Testy sprawdzają rozmiar powierzchni, odtwarzanie, początkowy fokus „Anuluj”, strzałki ograniczone do dialogu, Wstecz/Escape i przywrócenie fokusu. Parowanie oraz ponowną zgodę Google sprawdzono także przy celowo niedostępnym service workerze. Nie wykonywano zdalnego testu fizycznego telefonu użytkownika; aktualna konfiguracja LAN nadal celowo wymaga zatwierdzenia na laptopie.
-
-Każdy symulowany klient przeglądarkowy otrzymuje osobny adres z puli dokumentacyjnej przez zaufany lokalny proxy testowy. Dzięki temu niezależne scenariusze nie zużywają wspólnego limitu prób parowania na adresie loopback. Limity produkcyjne pozostają aktywne i są sprawdzane testami integracyjnymi.
 
 Manualnie na Web otwarto 1453 rzeczywiste materiały: 1443 z datą i 10 bez poprawnej daty. Sprawdzono postęp, przejścia między zdjęciami oraz podgląd 1920 px i pobranie oryginału w pełnym ekranie. Na rzeczywistym TV karta QR kończyła się na 465 px przy wysokości 540 px; wysokość dokumentu również wynosiła 540 px.
 
@@ -45,12 +45,10 @@ Pomiar wyświetlenia na TV obejmuje pobranie, dekodowanie i dwie klatki renderow
 
 To wyniki pojedynczych porównań w lokalnej sieci, bez gwarancji takiego czasu dla każdego pliku/połączenia. Przygotowanie następnego zdjęcia eliminuje powtórne pobranie gotowego podglądu; osobny test przeglądarkowy sprawdza ten warunek. TV pomija kosztowne rozmycia i próbkowanie klatek tła oraz awaryjne dekodowanie miniatur filmów/HEIF.
 
-## Utrzymanie i odtworzenie
+## Odtwarzanie sprawdzeń
 
-- `scripts/verify.sh`: build, Core, integracja i przeglądarka; na Windows sam zestaw przeglądarkowy uruchamia `scripts/test-browser.ps1`.
-- `tests/native/tv.spec.mjs`: rzeczywisty APK/WebView. `TEST_KEEP_TV_DATA=1` zachowuje ustawienia adresu, ale scenariusz testuje wylogowanie; po teście wymaga ponownego parowania. Nie używać kontrolowanego hosta z rzeczywistymi sekretami.
-- `scripts/check-tv-apk.ps1 -Path <apk>`: obecność trzech runtime ABI.
-- Logi, zrzuty i pomiary pozostają w ignorowanych `test-results/` oraz `artifacts/local/`; identyfikatory prywatnych plików, poświadczenia i certyfikaty prywatne nie należą do repozytorium.
-- Lokalny QR używa `Broker:PairingOrigin` z adresem LAN. Logowanie Google pozostaje na `Broker:PublicOrigin` laptopa, zgodnie z konfiguracją klienta OAuth; docelowe parowanie telefonem wymaga wspólnej domeny HTTPS. Szczegóły: [wdrożenie](DEPLOYMENT.md#qr-przez-lokalny-adres-ip).
+Polecenia, wymagania i artefakty opisuje [dokumentacja testowania](TESTING.md). Konfigurację lokalnego QR, logowania na laptopie i docelowego parowania telefonem opisuje [wdrożenie](DEPLOYMENT.md#qr-przez-lokalny-adres-ip).
+
+## Wynik refaktoryzacji
 
 Przy refaktoryzacji policzono złożoność funkcji JavaScript jako 1 + warunki, pętle, catch i operatory logiczne/warunkowe, bez zagnieżdżonych funkcji. `onKey`: 18 → 9, `mountMedia`: 14 → 7, `stream`: 16 → 9; nowe wydzielone funkcje mają maksymalnie 10. Publiczne API modułów pozostało bez zmiany dla istniejących wywołań.

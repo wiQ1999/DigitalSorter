@@ -91,23 +91,6 @@ Zmiana silnika po wybraniu hostingu wymaga dodania zgodnego z EF Core providera 
 - Magazyny poświadczeń, sesji i sekretów zachowują dane po restarcie oraz ponownym wdrożeniu.
 - GitHub Actions buduje i wdraża frontend oraz backend razem, z użyciem `dotnet publish`.
 
-## Standard testów
+## Weryfikacja
 
-### Testy jednostkowe
-
-- Core musi być pokryty testami jednostkowymi zgodnymi ze schematem Arrange–Act–Assert.
-- Testy muszą być deterministyczne i niezależne od sieci, systemu plików oraz usług zewnętrznych.
-- Minimalne pokrycie Core: 80% linii i 80% gałęzi.
-- Reguły walidacji daty, klasyfikowania materiałów i sortowania wymagają testów wszystkich istotnych przypadków.
-
-### Testy integracyjne
-
-- Warstwa Google Drive jest testowana przez jej publiczne interfejsy z użyciem kontrolowanych danych testowych.
-- Testy obejmują uwierzytelnianie, odświeżanie tokenów, wiele folderów, brak metadanych oraz błędy dostępu i sieci.
-- Testy brokera obejmują wspólny cykl OAuth dla obu klientów, odświeżanie po restarcie, ważność i jednokrotność parowania, powiązanie sesji z właściwym TV oraz wylogowanie i odłączenie Google.
-- Testy nie mogą korzystać z danych rzeczywistych użytkowników.
-
-### Pozostałe warstwy
-
-- Dla warstw prezentacji zalecane są testy logiki widoku, nawigacji, licznika i trybu pełnoekranowego.
-- Potok CI odrzuca zmianę, gdy testy nie przechodzą lub Core nie spełnia wymaganego pokrycia.
+Standard testów, wymagane pokrycie Core, zakres zestawów i polecenia uruchomienia opisuje [dokumentacja testowania](TESTING.md). Wyniki konkretnych przebiegów są publikowane w datowanych raportach wskazanych w [indeksie dokumentacji](README.md#wyniki-historyczne-i-licencje).

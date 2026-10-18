@@ -12,6 +12,26 @@ npm ci --ignore-scripts
 
 Do wdrożenia wybieraj wydany tag lub zatwierdzony commit.
 
+## Konfiguracja aplikacji
+
+Backend przyjmuje ustawienia ASP.NET Core, m.in. ze zmiennych środowiskowych lub magazynu sekretów. Podwójny podkreślnik w nazwie zmiennej odpowiada dwukropkowi w kluczu konfiguracji.
+
+| Zmienna środowiskowa | Znaczenie |
+|---|---|
+| `Google__ClientId` | Identyfikator klienta OAuth typu Web application. |
+| `Google__ClientSecret` | Sekret klienta Google; wymagany razem z Client ID. |
+| `Broker__PublicOrigin` | Kanoniczny origin HTTPS, bez ścieżki, używany do callbacku OAuth. |
+| `Broker__PairingOrigin` | Opcjonalny origin HTTPS kodu QR; domyślnie PublicOrigin. Wariant LAN opisano [poniżej](#qr-przez-lokalny-adres-ip). |
+| `Broker__TokenEncryptionKey` | Stały klucz AES: 32 bajty w Base64; wymagany w produkcji. |
+| `Broker__DataDirectory` | Trwały katalog SQLite i zaszyfrowanych kluczy sesji; domyślnie `data/` w katalogu zawartości backendu. |
+| `ConnectionStrings__Broker` | Opcjonalny connection string SQLite; domyślnie `broker.db` w DataDirectory. Nie wybiera innego silnika bazy. |
+| `AllowedHosts` | Dozwolone nazwy hostów, rozdzielone średnikami. |
+| `Broker__KnownProxies__0` | Adres zaufanego reverse proxy, jeśli jest używane; kolejne adresy mają indeksy `__1`, `__2` itd. |
+
+W Development brakujący klucz szyfrowania jest tworzony lokalnie jako `development.key` w DataDirectory. W produkcji podaj go z magazynu sekretów i zachowuj z backupem danych; utrata klucza uniemożliwia odszyfrowanie poświadczeń i kluczy sesji. Domyślne wdrożenie używa jednej instancji backendu i SQLite. Granice magazynu oraz zmianę silnika opisuje [architektura](ARCHITECTURE.md#magazyn-danych-brokera).
+
+`compose.yaml` mapuje zmienne `.env` (`APP_DOMAIN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`) na ustawienia backendu i Caddy. Przykład i procedura przygotowania serwera znajdują się w [sekcji produkcyjnej](#6-hosting-produkcyjny-i-https).
+
 ## 1. Certyfikat do testów tylko na laptopie
 
 ```bash
@@ -148,12 +168,7 @@ Klient OAuth jest wspólny dla Web i TV. SQLite, klucz deweloperski i sesje pozo
 
 ## 5. Testy automatyczne
 
-```bash
-npx playwright install --with-deps chrome
-TEST_PORT=7443 bash scripts/verify.sh
-```
-
-Testy używają własnego certyfikatu, kontrolowanego OAuth i syntetycznych plików. Nie wymagają konta Google ani certyfikatu z punktów 1–2. Port 7443 musi być wolny. Wyniki: `test-results/`. Test natywnego TV wykonuje osobny job CI z emulatorem i tymczasowym CA w Debug.
+Przygotowanie środowiska, polecenia dla Web/backendu i natywnego TV oraz lokalizacje wyników opisuje [dokumentacja testowania](TESTING.md). Testy automatyczne używają własnych certyfikatów i danych syntetycznych; nie wymagają konta Google ani certyfikatów z punktów 1–2.
 
 ## 6. Hosting produkcyjny i HTTPS
 
@@ -199,7 +214,7 @@ docker compose start app
 
 Uruchom backend również po błędzie kopiowania. Kopię z sekretami przechowuj zaszyfrowaną poza serwerem. Odtwarzaj kompletny katalog danych i odpowiadający mu `.env` przy zatrzymanym backendzie, z prawami zapisu dla użytkownika kontenera.
 
-GitHub Actions: w Environment `production` ustaw `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` (zweryfikowany klucz hosta). Przygotuj `/opt/digitalsorter/.env` i dostęp SSH/Docker. Uruchom workflow `Deploy`; wykona walidację i wdrożenie, bez tworzenia DNS, sekretów i backupu.
+GitHub Actions: w Environment `production` ustaw zmienne `DEPLOY_HOST`, `DEPLOY_USER` oraz sekrety `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` (zweryfikowany klucz hosta). Przygotuj `/opt/digitalsorter/.env` i dostęp SSH/Docker. Uruchom workflow `Deploy`; wykona walidację i wdrożenie, bez tworzenia DNS, sekretów i backupu.
 
 | Problem | Sprawdzenie |
 |---|---|

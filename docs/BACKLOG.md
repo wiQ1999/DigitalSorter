@@ -1,5 +1,7 @@
 # Backlog — DigitalSorter
 
+Poniższe zgłoszenia zostały zrealizowane. Lista zachowuje historię zadań produktowych; wyniki ich weryfikacji zawiera [raport z 18.10.2026](VALIDATION-2026-10-18.md), a bieżące zachowanie opisują [wymagania](PRODUCT_REQUIREMENTS.md).
+
 ## BL-001 — Pokazywanie postępu odczytywania metadanych
 **Status: Zrealizowane.** Widoczne wyszukiwanie, licznik odczytu, anulowanie i zakończenie; aktualizacje interfejsu ograniczone do 10/s.
 
