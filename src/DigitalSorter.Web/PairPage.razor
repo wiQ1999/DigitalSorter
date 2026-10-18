@@ -50,7 +50,7 @@
         _code = query["code"] ?? "";
         _consent = query["error"] is "consent" or "permission";
         if (_consent) _error = "Potwierdź ponownie zgodę na dostęp do Google Drive.";
-        try { await Broker.InitializeAsync(); if (Broker.Session.Authenticated && !Reauthorize && _code.Length > 0) await Check(); }
+        try { await Broker.InitializeSessionAsync(); if (Broker.Session.Authenticated && !Reauthorize && _code.Length > 0) await Check(); }
         catch (Exception ex) when (ex is HttpRequestException or JSException) { _error = "Nie można przygotować połączenia z brokerem. Sprawdź Internet i odśwież stronę."; }
         _loading = false; StateHasChanged();
     }

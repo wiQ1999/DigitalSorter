@@ -3,6 +3,8 @@ import {
   pauseRequest,
   thumbnailsFit,
   metadataRequest,
+  mediaFillsViewer,
+  disconnectFocus,
 } from "../browser/ui-helpers.mjs";
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -251,6 +253,23 @@ test(
         "Native TV contains the full photo inside the viewer",
       );
       await device.screenshot({ path: "test-results/native-tv-photos.png" });
+      await mediaFillsViewer(page);
+      await disconnectFocus(
+        page,
+        (key) =>
+          device.shell(
+            "input keyevent " +
+              {
+                ArrowRight: "KEYCODE_DPAD_RIGHT",
+                ArrowLeft: "KEYCODE_DPAD_LEFT",
+                ArrowUp: "KEYCODE_DPAD_UP",
+                ArrowDown: "KEYCODE_DPAD_DOWN",
+                Back: "KEYCODE_BACK",
+              }[key],
+          ),
+        "Back",
+        () => device.screenshot({ path: "test-results/native-tv-modal.png" }),
+      );
       await page.getByTestId("media-stage").focus();
       await device.shell("input keyevent KEYCODE_DPAD_RIGHT");
       await page.waitForFunction(() =>
@@ -287,6 +306,7 @@ test(
         .getByRole("button", { name: "Pełny ekran", exact: true })
         .click();
       await page.waitForSelector(".app-shell.fullscreen");
+      await mediaFillsViewer(page, true);
       await device.shell("input keyevent KEYCODE_BACK");
       await page.waitForSelector(".app-shell:not(.fullscreen)");
       await device.screenshot({ path: "test-results/native-tv-gallery.png" });

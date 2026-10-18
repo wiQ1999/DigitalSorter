@@ -74,7 +74,7 @@
                 @if (_gallery.Current is { } current)
                 {
                     var upcomingIndex = _gallery.Index + 1;
-                    <div class="viewer" data-testid="viewer"><MediaPlayer @key="(current.Id, _loadGeneration)" Asset="current" />
+                    <div class="viewer @(current.Kind == MediaKind.Video ? "video-viewer" : "")" data-testid="viewer"><MediaPlayer @key="(current.Id, _loadGeneration)" Asset="current" />
                         <div class="viewer-toolbar"><div class="media-caption"><span class="media-kind">@(current.Kind == MediaKind.Video ? "FILM" : "ZDJĘCIE")</span><strong>@current.Name</strong><span>@(current.CapturedAt?.ToString("dd.MM.yyyy · HH:mm:ss 'UTC'") ?? "Brak daty wykonania w metadanych")</span></div><button class="icon-button fullscreen-button" aria-label="@(_gallery.IsFullscreen ? "Zamknij pełny ekran" : "Pełny ekran")" @onclick="ToggleFullscreen">@(_gallery.IsFullscreen ? "↙" : "⛶")</button></div>
                     </div>
                     <nav class="gallery-navigation" aria-label="Nawigacja materiałów"><button class="button secondary" disabled="@(!_gallery.CanPrevious)" @onclick="Previous">← Poprzedni</button><span class="counter" data-testid="counter"><strong>@_gallery.Position</strong><span>/</span>@_gallery.Items.Count</span><button class="button secondary" disabled="@(!_gallery.CanNext)" @onclick="Next">Następny →</button></nav>
@@ -90,7 +90,7 @@
     }
     @if (_error is not null) { <div class="toast" role="alert"><span>@_error</span><button class="icon-button" aria-label="Zamknij komunikat" @onclick="() => _error = null">×</button>@if (_reauthorize) { @if (Broker.IsTv) { <button class="text-link" @onclick="Reconnect">Połącz ponownie</button> } else { <a href="@Broker.LoginUrl(consent: true)">Połącz ponownie</a> } }</div> }
     @if (_confirmDisconnect)
-    { <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="disconnect-title"><h2 id="disconnect-title">Odłączyć konto Google?</h2><p>Dostęp zostanie cofnięty w przeglądarkach i wszystkich powiązanych telewizorach. Pliki na Drive pozostaną bez zmian.</p><button class="button" @onclick="() => _confirmDisconnect = false">Anuluj</button><button class="button danger" @onclick="() => SignOut(true)">Odłącz wszędzie</button></section></div> }
+    { <dialog class="modal" @ref="_disconnectDialog" aria-labelledby="disconnect-title"><h2 id="disconnect-title">Odłączyć konto Google?</h2><p>Dostęp zostanie cofnięty w przeglądarkach i wszystkich powiązanych telewizorach. Pliki na Drive pozostaną bez zmian.</p><button class="button" autofocus @onclick="CancelDisconnect">Anuluj</button><button class="button danger" @onclick="() => SignOut(true)">Odłącz wszędzie</button></dialog> }
     <footer class="app-footer"><span>DIGITALSORTER</span><span>Wspomnienia należą do Ciebie.</span><span class="palette-dots"><i></i><i></i><i></i></span></footer>
 </div>
 
@@ -106,6 +106,8 @@
     private MediaReadProgress? _readProgress;
     private ElementReference _thumbnailStrip;
     private IJSObjectReference? _thumbnailObserver;
+    private ElementReference _disconnectDialog;
+    private IJSObjectReference? _dialogFocus;
     private PairingStarted? _pairing;
     private string _pairStatus = "Czekam na zatwierdzenie na telefonie…";
     private CancellationTokenSource? _operation, _pairCancellation;
@@ -129,6 +131,7 @@
             _initializing = false; StateHasChanged();
         }
         if (_reference is null || _disposed) return;
+        await SynchronizeDialog();
         if (_scrollProgressIntoView && _busy)
         {
             _scrollProgressIntoView = false;
@@ -150,6 +153,20 @@
     {
         try { _folders = await Library.GetFoldersAsync(parent); _parent = parent; }
         catch (DriveException ex) { Show(ex); }
+    }
+    [JSInvokable] public Task CancelDisconnect() { _confirmDisconnect = false; return InvokeAsync(StateHasChanged); }
+    private async Task SynchronizeDialog()
+    {
+        if (_confirmDisconnect && _dialogFocus is null)
+            _dialogFocus = await Broker.Module.InvokeAsync<IJSObjectReference>("openDialog", _disconnectDialog, _reference);
+        else if (!_confirmDisconnect) await CloseDialog();
+    }
+    private async Task CloseDialog()
+    {
+        if (_dialogFocus is not { } dialog) return;
+        _dialogFocus = null;
+        try { await dialog.InvokeVoidAsync("dispose"); await dialog.DisposeAsync(); }
+        catch (JSException) { }
     }
     private async Task OpenFolder(string id) { _folderStack.Push(_parent); await Browse(id); }
     private async Task Root() { _folderStack.Clear(); await Browse(null); }
@@ -266,6 +283,7 @@
         _disposed = true;
         _operation?.Cancel(); _pairCancellation?.Cancel(); _pairCancellation?.Dispose();
         await StopThumbnailObserver();
+        await CloseDialog();
         if (_reference is not null)
         {
             try { await Broker.Module.InvokeVoidAsync("unbindGallery"); } catch (JSException) { }

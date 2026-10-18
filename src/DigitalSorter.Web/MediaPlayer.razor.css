@@ -36,7 +36,7 @@
   grid-template-rows: minmax(0, 1fr);
   place-items: center;
   position: absolute;
-  inset: 8% 9%;
+  inset: 0;
 }
 
 .media-surface ::deep img,
