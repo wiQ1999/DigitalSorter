@@ -78,6 +78,8 @@ Logowanie Google nie odbywa się w WebView telewizora. Backend zachowuje zaszyfr
 
 Widok TV mieści parowanie, materiał, nawigację i pasek miniatur w całym obszarze WebView (także 960×540 CSS px przy obrazie 1920×1080). Po otwarciu kolekcji przycisk **Źródła** przełącza panel folderów. Długie listy przewijają się wewnątrz panelu, bez przewijania strony. TV używa podglądów Drive do 1280 px, bez rozmyć i ciągłego próbkowania filmu; brak miniatury wideo/HEIF pokazuje zastępczą ikonę zamiast uruchamiać dodatkowy dekoder. Oryginał pozostaje źródłem filmu i awaryjnego wyświetlania zdjęcia.
 
+Opis i przyciski są przezroczystymi nakładkami, więc pełny ekran udostępnia materiałowi całą wysokość. Okno **Odłącz konto** przejmuje fokus na **Anuluj**; strzałki nie przechodzą do tła, a Wstecz anuluje okno i przywraca fokus. Wersja 0.8.1 aktualizuje także ikonę, ekran startowy i kafelek launchera do kolorowego znaku z nagłówka.
+
 Do testów przez Wi-Fi na tym Philipsie działa autoryzowane `adb connect ADRES_TV:5555`. Używaj `--no-streaming`, jeżeli instalacja strumieniowa zatrzymuje się pod koniec transferu. Nie każdy TV udostępnia ADB przez LAN; po testach wyłącz debugowanie.
 
 Po instalacji możesz odłączyć USB i wyłączyć debugowanie; działanie aplikacji go nie wymaga.
@@ -131,7 +133,7 @@ Przed każdym kolejnym wydaniem zwiększ `ApplicationVersion` (liczbowy versionC
 W Play Console przygotuj:
 
 - Nazwę, krótki i pełny opis, kategorię, adres kontaktowy, ikonę 512×512, grafikę promocyjną 1024×500, banner sklepu Android TV 1280×720 i zrzuty ekranu z rzeczywistego TV/emulatora zgodne z aktualnymi wymaganiami konsoli.
-- Docelowy banner launchera TV z nazwą aplikacji, zgodny z wymaganiem 320×180 px. Obecny `Platforms/Android/Resources/drawable/tv_banner.xml` jest technicznym placeholderem; przed publikacją zastąp go gotową grafiką z tekstem aplikacji.
+- Banner launchera TV z nazwą aplikacji, zgodny z wymaganiem 320×180 px. Projekt generuje go z `Resources/Images/tv_banner.svg`; przed publikacją sprawdź wynik na docelowych launcherach. Nie zastępuje on osobnej grafiki promocyjnej sklepu.
 - Publiczną politykę prywatności pod HTTPS, dostępną także z aplikacji: operator, przetwarzane dane i poświadczenia, cel, retencja, kopie zapasowe, usunięcie danych i kontakt. Tej strony obecnie nie ma w repozytorium; przygotuj ją dla rzeczywistego hostingu.
 - Data safety zgodne z rzeczywistym działaniem brokera i WebView. Nie deklaruj braku zbierania danych: backend przechowuje identyfikator konta, poświadczenia i sesje. Pliki Drive są pobierane bezpośrednio przez klienta.
 - Deklaracje reklam, grupy odbiorców, ocenę treści oraz App access. Dla recenzenta opisz działający adres HTTPS, konfigurację serwera na TV, logowanie na telefonie i parowanie; zapewnij możliwość przejścia pełnego scenariusza z syntetycznymi mediami. Nie przekazuj Google Client Secret ani tokenów.
