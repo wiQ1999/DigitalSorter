@@ -15,6 +15,9 @@ public sealed class BrokerClient(HttpClient http, IJSRuntime js, DriveOptions dr
     private DotNetObjectReference<BrokerClient>? _reference;
     private readonly SemaphoreSlim _gate = new(1, 1);
     public bool IsTv { get; private set; }
+    public string LoginOrigin { get; private set; } = "";
+    public string LoginUrl(string returnUrl = "/", bool consent = false) => LoginOrigin + "/auth/login?" +
+        (consent ? "consent=true&" : "") + "returnUrl=" + Uri.EscapeDataString(returnUrl);
     public SessionInfo Session { get; private set; } = new(false);
     public IJSObjectReference Module => _module!;
 
@@ -22,13 +25,14 @@ public sealed class BrokerClient(HttpClient http, IJSRuntime js, DriveOptions dr
     {
         if (_module is null)
         {
-            _module = await js.InvokeAsync<IJSObjectReference>("import", "./js/media.js");
             var configuration = await http.GetFromJsonAsync<ClientConfiguration>("api/client-config");
+            _module = await js.InvokeAsync<IJSObjectReference>("import", "./js/media.js?v=" + Uri.EscapeDataString(configuration!.AssetVersion ?? "1"));
             driveOptions.FilesEndpoint = configuration!.DriveFilesEndpoint;
+            LoginOrigin = configuration.LoginOrigin ?? "";
             IsTv = await _module.InvokeAsync<bool>("isNativeTv");
             if (IsTv) _deviceToken = await _module.InvokeAsync<string?>("secureStorage", "get", null);
             _reference = DotNetObjectReference.Create(this);
-            await _module.InvokeVoidAsync("initialize", _reference, IsTv, driveOptions.FilesEndpoint);
+            await _module.InvokeVoidAsync("initialize", _reference, IsTv, driveOptions.FilesEndpoint, configuration.AssetVersion);
         }
         using var response = await SendAsync(HttpMethod.Get, "api/session");
         response.EnsureSuccessStatusCode();
@@ -112,4 +116,4 @@ public sealed class BrokerClient(HttpClient http, IJSRuntime js, DriveOptions dr
     }
 }
 
-public sealed record ClientConfiguration(string DriveFilesEndpoint);
+public sealed record ClientConfiguration(string DriveFilesEndpoint, string? AssetVersion = null, string? LoginOrigin = null);

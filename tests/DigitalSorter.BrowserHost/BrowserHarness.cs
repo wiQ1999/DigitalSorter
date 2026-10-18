@@ -74,14 +74,23 @@ public sealed class ControlledEndpoints(ControlledGoogle google, string origin, 
     ];
     public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
     {
+        var assets = DigitalSorter.Auth.WebAssets.Revision(app.ApplicationServices.GetRequiredService<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>().WebRootFileProvider);
         var unavailableThumbnails = false;
+        int? mediaFailure = null;
+        var mediaReads = new System.Collections.Concurrent.ConcurrentDictionary<string, int>();
         app.Use(async (context, continueRequest) =>
         {
             var path = context.Request.Path.Value ?? "";
+            if (path == "/test-drive/stats")
+            {
+                await context.Response.WriteAsJsonAsync(mediaReads);
+                return;
+            }
             if (path == "/test-drive/control" && context.Request.Method == "POST")
             {
                 using var body = await JsonDocument.ParseAsync(context.Request.Body);
-                unavailableThumbnails = body.RootElement.GetProperty("unavailableThumbnails").GetBoolean();
+                if (body.RootElement.TryGetProperty("unavailableThumbnails", out var thumbnails)) unavailableThumbnails = thumbnails.GetBoolean();
+                if (body.RootElement.TryGetProperty("mediaStatus", out var mediaStatus)) mediaFailure = mediaStatus.ValueKind == JsonValueKind.Null ? null : mediaStatus.GetInt32();
                 context.Response.StatusCode = 204;
                 return;
             }
@@ -98,7 +107,7 @@ public sealed class ControlledEndpoints(ControlledGoogle google, string origin, 
             var clientOrigin = context.Request.Scheme + "://" + context.Request.Host;
             if (path == "/api/client-config")
             {
-                await context.Response.WriteAsJsonAsync(new { DriveFilesEndpoint = clientOrigin + "/test-drive/files" });
+                await context.Response.WriteAsJsonAsync(new { DriveFilesEndpoint = clientOrigin + "/test-drive/files", AssetVersion = assets, LoginOrigin = origin });
                 return;
             }
             if (path == "/test-oauth/authorize")
@@ -117,7 +126,10 @@ public sealed class ControlledEndpoints(ControlledGoogle google, string origin, 
                 context.Response.Redirect(origin + "/auth/callback?code=" + code + "&state=" + Uri.EscapeDataString(query["state"]!)); return;
             }
             if (!path.StartsWith("/test-drive/", StringComparison.Ordinal)) { await continueRequest(); return; }
-            if (google.RefreshError == "invalid_grant" || context.Request.Headers.Authorization != "Bearer controlled-access-token") { context.Response.StatusCode = 401; return; }
+            if (path == "/test-drive/files/mp4" && context.Request.Query["alt"] == "media" && mediaFailure is { } status)
+            { context.Response.StatusCode = status; return; }
+            var signedThumbnail = path.StartsWith("/test-drive/thumb/", StringComparison.Ordinal) && context.Request.Query["signature"] == "controlled-thumbnail";
+            if (google.RefreshError == "invalid_grant" || (!signedThumbnail && context.Request.Headers.Authorization != "Bearer controlled-access-token")) { context.Response.StatusCode = 401; return; }
             if (unavailableThumbnails && path.StartsWith("/test-drive/thumb/", StringComparison.Ordinal)) { context.Response.StatusCode = 403; return; }
             if (path == "/test-drive/files")
             {
@@ -137,8 +149,12 @@ public sealed class ControlledEndpoints(ControlledGoogle google, string origin, 
             var id = path.Split('/').Last(); var spec = Files.SingleOrDefault(x => x.Id == id);
             if (spec is null || !spec.Available) { context.Response.StatusCode = 404; return; }
             if (context.Request.Query.ContainsKey("fields"))
-            { await context.Response.WriteAsJsonAsync(new { thumbnailLink = clientOrigin + "/test-drive/thumb/" + id }); return; }
+            {
+                if (context.Request.Query["fields"].ToString().Contains(",size")) mediaReads.AddOrUpdate("preview-" + id, 1, (_, count) => count + 1);
+                await context.Response.WriteAsJsonAsync(new { thumbnailLink = clientOrigin + "/test-drive/thumb/" + id + "?signature=controlled-thumbnail",
+                size = new FileInfo(Path.Combine(fixturePath, spec.Fixture)).Length.ToString() }); return; }
             var fixture = path.Contains("/thumb/") ? "landscape.jpg" : spec.Fixture;
+            if (context.Request.Query["alt"] == "media") mediaReads.AddOrUpdate(id, 1, (_, count) => count + 1);
             var bytes = await File.ReadAllBytesAsync(Path.Combine(fixturePath, fixture));
             context.Response.ContentType = path.Contains("/thumb/") ? "image/jpeg" : spec.Mime;
             context.Response.Headers.AcceptRanges = "bytes";
@@ -149,7 +165,7 @@ public sealed class ControlledEndpoints(ControlledGoogle google, string origin, 
                 var end = parts.Length > 1 && long.TryParse(parts[1], out var last) ? Math.Min(last, bytes.Length - 1) : bytes.Length - 1;
                 if (start >= bytes.Length) { context.Response.StatusCode = 416; context.Response.Headers.ContentRange = "bytes */" + bytes.Length; return; }
                 context.Response.StatusCode = 206;
-                context.Response.Headers.ContentRange = $"bytes {start}-{end}/{bytes.Length}";
+                // Simulate Drive's CORS: Content-Length is visible, Content-Range is hidden.
                 context.Response.ContentLength = end - start + 1;
                 await context.Response.Body.WriteAsync(bytes.AsMemory((int)start, (int)(end - start + 1))); return;
             }
