@@ -6,6 +6,7 @@ Galeria zdjęć i filmów z Google Drive, sortowana według daty wykonania. Web 
 
 Instrukcje krok po kroku:
 
+- [Szybkie uruchomienie na przygotowanym laptopie Windows](docs/DEPLOYMENT-LOCAL.md).
 - [Lokalne testy i wdrożenie produkcyjne przez HTTPS, certyfikaty](docs/DEPLOYMENT.md).
 - [Instalacja Android TV przez USB i publikacja w Google Play](docs/ANDROID_TV.md).
 
