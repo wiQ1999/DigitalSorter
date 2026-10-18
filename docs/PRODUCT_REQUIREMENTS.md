@@ -46,7 +46,7 @@
 - Aktywny materiał można wyświetlić w trybie pełnoekranowym.
 - Aplikacja informuje o materiałach niedostępnych lub nieobsługiwanych.
 - Web i TV mają wspólny interfejs; paletę określa [architektura](ARCHITECTURE.md#aplikacja-webowa).
-- Poza pełnym ekranem tło materiału dopasowuje się do kolorów jego brzegów, także podczas odtwarzania filmu.
+- Na komputerze, poza pełnym ekranem, tło materiału dopasowuje się do kolorów jego brzegów, także podczas odtwarzania filmu. TV pomija kosztowne rozmycia i ciągłe próbkowanie klatek; szczegóły opisuje [architektura](ARCHITECTURE.md#aplikacja-webowa).
 
 ## Ochrona danych
 

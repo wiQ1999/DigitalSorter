@@ -1,24 +1,14 @@
 # DigitalSorter
 
-Galeria zdjęć i filmów z Google Drive, sortowana według daty wykonania. Web i Android TV korzystają z tego samego interfejsu; multimedia są pobierane bezpośrednio z Drive.
+Galeria zdjęć i filmów z Google Drive, sortowana według daty wykonania. Web i Android TV korzystają z tego samego interfejsu; multimedia są pobierane bezpośrednio z Drive, bez modyfikowania materiałów źródłowych.
 
-## Uruchomienie
+Obsługiwane zdjęcia: JPEG, PNG, WebP i HEIC/HEIF. Wideo: MP4, WebM i MOV; odtwarzanie zależy również od kodeków urządzenia. Materiały bez poprawnej daty wykonania trafiają do osobnej listy. Daty Drive `createdTime`/`modifiedTime` nie zastępują daty wykonania; daty bez strefy są interpretowane jako UTC.
 
-Instrukcje krok po kroku:
+## Pierwsze uruchomienie
 
-- [Szybkie uruchomienie na przygotowanym laptopie Windows](docs/DEPLOYMENT-LOCAL.md).
-- [Lokalne testy i wdrożenie produkcyjne przez HTTPS, certyfikaty](docs/DEPLOYMENT.md).
-- [Instalacja Android TV przez USB i publikacja w Google Play](docs/ANDROID_TV.md).
+Na przygotowanym laptopie Windows skorzystaj z [lokalnej instrukcji startu](docs/DEPLOYMENT-LOCAL.md). Nowe środowisko przygotuj według [instrukcji wdrożenia](docs/DEPLOYMENT.md).
 
-Zadania i uwagi z testów: [backlog](docs/BACKLOG.md).
-
-Wyniki Web, fizycznego TV ARM32 i pomiarów wydajności: [weryfikacja 18.10.2026](docs/VALIDATION-2026-10-18.md).
-
-Wymagane: SDK z `global.json`, Node.js 22+, HTTPS. Dla TV: workload `maui-android`, JDK 21, Android SDK 36.
-
-Lokalne demo bez konta Google: przygotuj certyfikat według [instrukcji](docs/DEPLOYMENT.md), wykonaj `npm ci --ignore-scripts` i `bash scripts/run-local-demo.sh`. Ten sam backend może obsługiwać TV i telefon w LAN przez HTTPS.
-
-Uruchomienie backendu z rzeczywistym Google przez HTTPS:
+Wymagane: SDK wskazane w `global.json`, Node.js 22+ i HTTPS. Po przygotowaniu certyfikatu oraz konfiguracji Google według [procedury lokalnego backendu](docs/DEPLOYMENT.md#4-lokalny-backend-z-rzeczywistym-google-drive--opcjonalnie), uruchom z katalogu repozytorium:
 
 ```bash
 npm ci --ignore-scripts
@@ -27,66 +17,18 @@ dotnet restore DigitalSorter.slnx --locked-mode
 dotnet run --project src/DigitalSorter.Auth --launch-profile https
 ```
 
-Konfiguracja przez zmienne środowiskowe lub magazyn sekretów:
+Otwórz `https://localhost:7043`, połącz Google Drive, wybierz foldery i otwórz kolekcję. Bez konta Google możesz uruchomić [demo z syntetycznymi danymi](docs/DEPLOYMENT.md#3-lokalne-demo-bez-konta-google).
 
-| Zmienna | Wartość |
-|---|---|
-| `Google__ClientId` | Identyfikator klienta OAuth typu Web application |
-| `Google__ClientSecret` | Sekret klienta Google |
-| `Broker__PublicOrigin` | Publiczny origin HTTPS, bez ścieżki |
-| `Broker__PairingOrigin` | Opcjonalny adres HTTPS kodu QR, np. adres LAN laptopa; domyślnie PublicOrigin |
-| `Broker__TokenEncryptionKey` | Stały klucz AES, 32 bajty w Base64; wymagany w produkcji |
-| `Broker__DataDirectory` | Trwały katalog SQLite i zaszyfrowanych kluczy sesji |
-| `ConnectionStrings__Broker` | Opcjonalny connection string SQLite; domyślnie `broker.db` w `Broker__DataDirectory` |
-| `AllowedHosts` | Dozwolona nazwa hosta |
-| `Broker__KnownProxies__0` | Adres zaufanego reverse proxy, jeśli jest używane |
+## Dokumentacja
 
-W Google Cloud włącz Drive API, zakresy `openid` i `drive.readonly` oraz callback `<PublicOrigin>/auth/callback`. Status Testing Google ogranicza trwałość tokenów Drive do siedmiu dni. Publiczna aplikacja wymaga weryfikacji zakresu restricted.
+Pełna [mapa dokumentacji](docs/README.md) wskazuje przeznaczenie poszczególnych plików.
 
-W Development aplikacja tworzy lokalny klucz szyfrowania. W produkcji podaj klucz z magazynu sekretów i zachowuj go wraz z backupem danych. Utrata klucza uniemożliwia odszyfrowanie poświadczeń. Backend używa SQLite i jest wdrażany jako jedna instancja. Magazyn brokera można podmienić przez DI; sposób późniejszego podłączenia innego silnika opisuje [architektura](docs/ARCHITECTURE.md#magazyn-danych-brokera).
-
-## Android TV
-
-```bash
-dotnet workload install maui-android --skip-manifest-update
-dotnet build src/DigitalSorter.AndroidTV -c Debug -p:RuntimeIdentifier=android-arm64
-```
-
-Zainstaluj `*Signed.apk`, wpisz adres HTTPS serwera i wybierz „Połącz przez telefon”. Telefon zatwierdza kod/QR. Sekret sesji TV pozostaje w natywnym `SecureStorage`; Google `refresh_token` pozostaje na backendzie. Pilot: strzałki, OK, Play/Pause i Wstecz.
-
-## Testy
-
-```bash
-npm ci --ignore-scripts
-npx playwright install --with-deps chrome
-scripts/verify.sh
-```
-
-- Jednostkowe: deterministyczne reguły Core; wymagane ≥80% linii i gałęzi.
-- Integracyjne: SQLite, trwałe sesje, szyfrowanie, OIDC z podpisami RSA i PKCE, tokeny, parowanie, publiczny adapter Drive i prawdziwe kontenery multimediów.
-- Przeglądarkowe: opublikowany WebAssembly, kontrolowany OAuth/Drive, Web i adapter TV, postęp/anulowanie/błędy odczytu, odtwarzanie, HEIC/HEIF, miniatury, zmiana szerokości, nawigacja, pełny ekran i dynamiczne tło.
-- Natywne TV: osobny job CI uruchamia APK na emulatorze Android TV z KVM — start, parowanie, rzeczywisty `SecureStorage`, restart, formaty mediów i pilot. Wyniki zawierają zrzuty ekranu i logcat.
-- Dane testowe są syntetyczne; testy nie wymagają konta Google. `Testing` i host kontrolowanego OAuth służą wyłącznie testom i nie są częścią obrazu produkcyjnego.
-
-Domyślnie testy używają Google Chrome z kodekiem H.264. `TEST_CHROMIUM` wskazuje opcjonalny lokalny plik przeglądarki z tym kodekiem. Wyniki, pokrycie i zrzuty trafiają do `test-results/`. Regeneracja mediów: `tests/fixtures/generate.py` z Pillow 11.3.0, pillow-heif 1.1.0 i ffmpeg.
-
-Windows: `pwsh -File scripts/test-browser.ps1` (domyślnie port 7543).
-
-Test natywny: `scripts/test-native-tv.sh`, uruchomiony emulator z ADB oraz artefakt `native-tv-fixture` z CI. Konfigurację natywną obsługuje systemowy UI Automator, a WebView — Playwright. Tymczasowy CA jest dodawany przez `DigitalSorterTestCertificate` tylko do Debug; Release odrzuca ten parametr. Domyślne APK nie zawierają testowego CA.
-
-## Wdrożenie
-
-Wymagania hostingu: [architektura](docs/ARCHITECTURE.md#hosting-i-wdrożenie).
-
-`compose.yaml` uruchamia wspólną aplikację i Caddy z HTTPS. Na serwerze ustaw w lokalnym `.env`: `APP_DOMAIN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`. Domenę skieruj na serwer; udostępnij porty 80/443. Sekretów nie zapisuj w repozytorium.
-
-```bash
-docker compose up -d --build
-```
-
-Workflow `Validate` buduje aplikacje, wykonuje piramidę testów i publikuje artefakty. Ręczny workflow `Deploy` najpierw wykonuje walidację, następnie wdraża wspólny obraz na skonfigurowany serwer Docker. Środowisko GitHub `production`: zmienne `DEPLOY_HOST`, `DEPLOY_USER`; sekrety `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`. Użytkownik SSH musi mieć dostęp do Dockera i `/opt/digitalsorter`; `.env` przygotowuje się tam przed pierwszym wdrożeniem.
-
-Materiały bez poprawnej daty trafiają do osobnej listy. Daty Drive `createdTime`/`modifiedTime` nie zastępują daty wykonania. Daty bez strefy są interpretowane jako UTC. Brak obsługi konkretnego kodeka lub uszkodzony plik daje komunikat w odtwarzaczu.
+- [Wymagania i funkcje produktu](docs/PRODUCT_REQUIREMENTS.md) oraz [integracja z Google Drive](docs/GOOGLE_DRIVE_INTEGRATION.md).
+- [Architektura i magazyn danych brokera](docs/ARCHITECTURE.md).
+- [Konfiguracja, certyfikaty, wdrożenie i backup](docs/DEPLOYMENT.md).
+- [Instalacja Android TV i publikacja w Google Play](docs/ANDROID_TV.md).
+- [Uruchamianie testów i standard weryfikacji](docs/TESTING.md).
+- [Backlog](docs/BACKLOG.md) i [raport weryfikacji z 18.10.2026](docs/VALIDATION-2026-10-18.md).
 
 ## Licencja
 

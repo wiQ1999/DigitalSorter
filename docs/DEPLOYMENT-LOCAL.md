@@ -4,17 +4,25 @@ Procedura dla przygotowanego laptopa i tego samego konta Windows. Wymaga lokalne
 
 ## Start z rzeczywistym Google Drive
 
-1. Otwórz PowerShell i wykonaj:
+1. Otwórz PowerShell w katalogu repozytorium i wykonaj:
 
    ```powershell
-   Set-Location D:\Projects\DigitalSorter\DigitalSorter
    .\artifacts\local\Start-GoogleDrive.ps1
    ```
 
    Backend i Web uruchomią się w tle.
 
 2. Otwórz [https://localhost:7043](https://localhost:7043), zaloguj się w razie potrzeby, wybierz folder i kliknij **Otwórz kolekcję**.
-3. Na TV uruchom DigitalSorter. Zapisany adres serwera: `https://192.168.0.222:7443`. Laptop i TV muszą być w tej samej sieci. Jeśli aplikacja wymaga parowania, zatwierdź kod na zalogowanym laptopie pod [https://localhost:7043/pair](https://localhost:7043/pair).
+3. Na TV uruchom DigitalSorter i użyj adresu serwera z lokalnej konfiguracji LAN. Laptop i TV muszą być w tej samej sieci. Jeśli aplikacja wymaga parowania, zatwierdź kod na zalogowanym laptopie pod [https://localhost:7043/pair](https://localhost:7043/pair).
+
+Jeżeli przygotowano dostęp TV przez LAN, bieżący adres i port można odczytać z katalogu repozytorium:
+
+```powershell
+Get-Content .\artifacts\local\tv\lan-settings.json -Raw |
+    ConvertFrom-Json | Select-Object Address, Port
+```
+
+Adres wpisywany na TV ma postać `https://<Address>:<Port>`. Brak tego pliku oznacza, że trzeba najpierw przygotować [konfigurację LAN i certyfikat](DEPLOYMENT.md#qr-przez-lokalny-adres-ip).
 
 ## Sprawdzenie i zatrzymanie
 
