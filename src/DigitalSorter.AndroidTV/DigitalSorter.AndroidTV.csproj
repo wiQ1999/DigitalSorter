@@ -13,8 +13,8 @@
 
     <ApplicationTitle>DigitalSorter Android TV</ApplicationTitle>
     <ApplicationId>pl.wiq1999.digitalsorter.androidtv</ApplicationId>
-    <ApplicationDisplayVersion>0.8.0</ApplicationDisplayVersion>
-    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.8.1</ApplicationDisplayVersion>
+    <ApplicationVersion>2</ApplicationVersion>
     <SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
   </PropertyGroup>
 
@@ -23,8 +23,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <MauiIcon Include="Resources\AppIcon\appicon.svg" />
-    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#000000" BaseSize="128,128" />
+    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="../DigitalSorter.Web/wwwroot/icon.svg" ForegroundScale="0.65" />
+    <MauiSplashScreen Include="../DigitalSorter.Web/wwwroot/icon.svg" Color="#0b1018" BaseSize="128,128" />
+    <MauiImage Include="Resources\Images\tv_banner.svg" BaseSize="320,180" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)' == 'Debug' and '$(DigitalSorterTestCertificate)' != ''">
