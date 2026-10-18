@@ -11,6 +11,8 @@ Instrukcje krok po kroku:
 
 Zadania i uwagi z testów: [backlog](docs/BACKLOG.md).
 
+Wyniki Web, fizycznego TV ARM32 i pomiarów wydajności: [weryfikacja 18.10.2026](docs/VALIDATION-2026-10-18.md).
+
 Wymagane: SDK z `global.json`, Node.js 22+, HTTPS. Dla TV: workload `maui-android`, JDK 21, Android SDK 36.
 
 Lokalne demo bez konta Google: przygotuj certyfikat według [instrukcji](docs/DEPLOYMENT.md), wykonaj `npm ci --ignore-scripts` i `bash scripts/run-local-demo.sh`. Ten sam backend może obsługiwać TV i telefon w LAN przez HTTPS.
@@ -31,6 +33,7 @@ Konfiguracja przez zmienne środowiskowe lub magazyn sekretów:
 | `Google__ClientId` | Identyfikator klienta OAuth typu Web application |
 | `Google__ClientSecret` | Sekret klienta Google |
 | `Broker__PublicOrigin` | Publiczny origin HTTPS, bez ścieżki |
+| `Broker__PairingOrigin` | Opcjonalny adres HTTPS kodu QR, np. adres LAN laptopa; domyślnie PublicOrigin |
 | `Broker__TokenEncryptionKey` | Stały klucz AES, 32 bajty w Base64; wymagany w produkcji |
 | `Broker__DataDirectory` | Trwały katalog SQLite i zaszyfrowanych kluczy sesji |
 | `AllowedHosts` | Dozwolona nazwa hosta |
@@ -64,6 +67,8 @@ scripts/verify.sh
 - Dane testowe są syntetyczne; testy nie wymagają konta Google. `Testing` i host kontrolowanego OAuth służą wyłącznie testom i nie są częścią obrazu produkcyjnego.
 
 Domyślnie testy używają Google Chrome z kodekiem H.264. `TEST_CHROMIUM` wskazuje opcjonalny lokalny plik przeglądarki z tym kodekiem. Wyniki, pokrycie i zrzuty trafiają do `test-results/`. Regeneracja mediów: `tests/fixtures/generate.py` z Pillow 11.3.0, pillow-heif 1.1.0 i ffmpeg.
+
+Windows: `pwsh -File scripts/test-browser.ps1` (domyślnie port 7543).
 
 Test natywny: `scripts/test-native-tv.sh`, uruchomiony emulator z ADB oraz artefakt `native-tv-fixture` z CI. Konfigurację natywną obsługuje systemowy UI Automator, a WebView — Playwright. Tymczasowy CA jest dodawany przez `DigitalSorterTestCertificate` tylko do Debug; Release odrzuca ten parametr. Domyślne APK nie zawierają testowego CA.
 

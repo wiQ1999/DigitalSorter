@@ -98,6 +98,29 @@ Demo używa syntetycznych danych, bez sekretów Google. Host testowy nie wchodzi
 
 ## 4. Lokalny backend z rzeczywistym Google Drive — opcjonalnie
 
+### Kto konfiguruje Google Cloud
+
+| Czynność | Kto i jak często |
+|---|---|
+| Projekt, Google Drive API, ekran zgody i klient OAuth typu aplikacja internetowa | Administrator, jednorazowo dla aplikacji/środowiska; aktualizuje adresy przy zmianie hostingu |
+| Platforma uwierzytelniania Google → Odbiorcy → Użytkownicy testowi → Dodaj użytkowników | Administrator dodaje każde konto testera, dopóki aplikacja jest w trybie testowym |
+| Logowanie Google i zgoda na odczyt Dysku | Użytkownik na swoim koncie; bez dostępu do konsoli Google Cloud |
+| Publikacja i weryfikacja zakresu `drive.readonly` | Administrator przed publicznym udostępnieniem; kolejne osoby logują się bez ręcznego dopisywania do testerów |
+
+Tryb testowy dla zewnętrznych odbiorców obejmuje do 100 testerów; przy używanym zakresie Drive autoryzacja/refresh token wygasa po siedmiu dniach. Zmiana statusu na produkcyjny nie zastępuje wymaganej weryfikacji restricted scope i ewentualnej oceny bezpieczeństwa. Źródła: [Odbiorcy aplikacji](https://support.google.com/cloud/answer/15549945?hl=en), [weryfikacja ograniczonych zakresów](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification).
+
+Polskie nazwy sekcji konsoli: **Interfejsy API i usługi → Biblioteka → Google Drive API → Włącz**, następnie **Platforma uwierzytelniania Google → Promowanie marki / Odbiorcy / Dostęp do danych / Klienci**. Włączenie API wymaga uprawnienia `serviceusage.services.enable` w wybranym projekcie; brak tego uprawnienia rozwiązuje administrator projektu albo utworzenie własnego projektu.
+
+### QR przez lokalny adres IP
+
+Opcjonalne `Broker__PairingOrigin=https://ADRES_LAN_LAPTOPA:7443` zmienia adres QR, pozostawiając `Broker__PublicOrigin=https://localhost:7043` dla istniejącego klienta Google. Ustaw aktualny adres karty Wi-Fi/Ethernet obsługującej TV, rezerwację DHCP, certyfikat z SAN tego IP oraz regułę zapory ograniczoną do adresów urządzeń testowych. Nie wybieraj adresu wirtualnego interfejsu i nie generuj originu z nagłówka `Host`.
+
+W takim wariancie QR otwiera stronę parowania w LAN, ale **zatwierdzenie wykonaj na zalogowanym laptopie pod `https://localhost:7043/pair`**, wpisując kod TV. Strona na telefonie wyjaśnia ten krok. `localhost` telefonu oznacza telefon; prywatny adres IP nie jest dopuszczalnym adresem powrotu klienta internetowego Google. Źródło: [reguły redirect URI Google](https://developers.google.com/identity/protocols/oauth2/web-server#uri-validation).
+
+Pełne logowanie z telefonu Android/iPhone wymaga wspólnej domeny HTTPS: ustaw tę samą domenę jako `PublicOrigin` i `PairingOrigin`, zarejestruj dokładny callback i zaczynaj logowanie na tej domenie (cookie korelacji OAuth musi wrócić na ten sam host). Wariant z publicznie zaufanym CA i DNS-01 opisano w punkcie 2; nie zależy on od systemu telefonu.
+
+W lokalnym Debug można dodać **publiczny certyfikat własnego CA** przez `DigitalSorterTestCertificate=<publiczne-ca.pem>`. Certyfikat serwera musi być podpisany przez ten CA i zawierać SAN z adresem laptopa. Release odrzuca tę opcję. Jeśli również telefon ma otwierać lokalne HTTPS z takim CA, właściciel instaluje i sprawdza zaufanie do publicznego CA w systemie/przeglądarce; do urządzenia nie przekazuj PFX, klucza prywatnego ani hasła CA. Zaufanie i kroki instalacji różnią się między Androidem i iOS, więc do docelowego wdrożenia użyj publicznego CA.
+
 W [Google Cloud Console](https://console.cloud.google.com/):
 
 1. Utwórz projekt testowy i włącz Google Drive API.
