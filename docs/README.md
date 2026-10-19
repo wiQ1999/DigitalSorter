@@ -24,6 +24,8 @@ Punkt wejścia do projektu i skrócone uruchomienie: [README](../README.md).
 
 [Raport z 18.10.2026](VALIDATION-2026-10-18.md) dokumentuje konkretną weryfikację oraz pomiary, wraz z ich ograniczeniami. Nie zastępuje instrukcji testowania ani potwierdzenia działania późniejszych zmian.
 
+[Raport z 19.10.2026](VALIDATION-2026-10-19.md) opisuje diagnozę błędu Wstecz w CI Android TV, poprawkę zgodności z Androidem 16 i lokalną weryfikację wraz z ograniczeniami.
+
 [Licencja projektu](../LICENSE.md) określa warunki użycia własnego kodu. [Informacje o zależnościach dekodera](../src/DigitalSorter.Web/wwwroot/licenses/THIRD_PARTY_NOTICES.txt) prowadzą do licencji i źródeł komponentów zewnętrznych.
 
 Instrukcje pracy wyłącznie dla agenta AI znajdują się w [AGENTS.md](../AGENTS.md). Opis produktu i procedury dla ludzi pozostają w dokumentacji tematycznej.
