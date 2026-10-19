@@ -4,8 +4,10 @@
   <uses-feature android:name="android.software.leanback" android:required="true" />
   <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
+  <!-- MAUI 10.0.0 routes Back through OnBackPressed; Android 16 otherwise bypasses it. -->
   <application
       android:allowBackup="false"
+      android:enableOnBackInvokedCallback="false"
       android:banner="@drawable/tv_banner"
       android:supportsRtl="true"
       android:usesCleartextTraffic="false" />
